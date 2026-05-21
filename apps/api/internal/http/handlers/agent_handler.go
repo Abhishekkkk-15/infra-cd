@@ -25,6 +25,25 @@ func CreateAgent(c *gin.Context) {
 	c.JSON(http.StatusCreated, agent)
 }
 
+// VerifyAgent handles GET /agents/verify
+func VerifyAgent(c *gin.Context) {
+	token := c.GetHeader("Authorization")
+	if token == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing token"})
+		return
+	}
+	// Strip "Bearer "
+	if len(token) > 7 && token[:7] == "Bearer " {
+		token = token[7:]
+	}
+	agent, err := services.VerifyAgent(token)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+		return
+	}
+	c.JSON(http.StatusOK, agent)
+}
+
 // ListAgents handles GET /agents
 func ListAgents(c *gin.Context) {
 	agents, err := services.ListAgents()

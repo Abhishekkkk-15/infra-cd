@@ -40,33 +40,32 @@ export const Agents: React.FC = () => {
     }
   });
 
-  // Add Agent mutation
+  const [createdAgent, setCreatedAgent] = useState<Agent | null>(null);
+
   const addAgentMutation = useMutation({
-    mutationFn: async (data: { name: string; ipAddress: string; os: string; dockerVersion: string; capacity: number }) => {
+    mutationFn: async (data: { name: string }) => {
       const res = await apiClient.post('/agents', data);
       return res.data;
     },
     onSuccess: (newAgent) => {
       queryClient.invalidateQueries({ queryKey: ['agents-list'] });
-      notification.success('Agent Provisioned', `Runner ${newAgent.name} registered and waiting for daemon connection.`);
-      setIsModalOpen(false);
+      notification.success('Agent Provisioned', `Runner ${newAgent.name} registered.`);
+      setCreatedAgent(newAgent);
     }
   });
 
-  const handleRegisterAgent = () => {
-    // Generate a random mock runner
-    const suffix = Math.floor(Math.random() * 90) + 10;
-    addAgentMutation.mutate({
-      name: `eu-west-runner-${suffix}`,
-      ipAddress: `18.197.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
-      os: 'Ubuntu 24.04 LTS (aarch64)',
-      dockerVersion: '26.1.1',
-      capacity: 4
-    });
+  const handleRegisterAgent = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const name = formData.get('name') as string;
+    if (name) {
+      addAgentMutation.mutate({ name });
+    }
   };
 
   const handleCopyInstallCmd = () => {
-    const cmd = 'curl -fsSL https://get.infra-cd.dev/agent.sh | sh -s -- --token icd_tok_84a2f8b0ea12 --server https://console.infra-cd.dev';
+    if (!createdAgent) return;
+    const cmd = `curl -fsSL https://get.infra-cd.dev/agent.sh | sh -s -- --token ${createdAgent.token} --server ${window.location.origin}`;
     navigator.clipboard.writeText(cmd);
     setCopiedText(true);
     notification.success('Copied install script', 'Ready to run in terminal.');
@@ -75,8 +74,8 @@ export const Agents: React.FC = () => {
 
   // Metric averages
   const onlineAgents = agents.filter((a) => a.status === 'online');
-  const totalCapacity = onlineAgents.reduce((sum, a) => sum + a.capacity, 0);
-  const activeJobs = onlineAgents.reduce((sum, a) => sum + a.activeJobsCount, 0);
+  const totalCapacity = onlineAgents.reduce((sum, a) => sum + (a.capacity || 4), 0);
+  const activeJobs = onlineAgents.reduce((sum, a) => sum + (a.activeJobsCount || 0), 0);
 
   return (
     <div className="space-y-6 font-sans select-none">
@@ -202,12 +201,12 @@ export const Agents: React.FC = () => {
                   </div>
                   <div className="pt-2">
                     <span>Task Capacity:</span>
-                    <span className="text-zinc-300 font-bold block mt-0.5">{a.activeJobsCount} / {a.capacity} occupied</span>
+                    <span className="text-zinc-300 font-bold block mt-0.5">{(a.activeJobsCount || 0)} / {(a.capacity || 4)} occupied</span>
                   </div>
                   <div className="pt-2">
                     <span>Last heartbeat:</span>
                     <span className="text-zinc-350 block mt-0.5">
-                      {a.status === 'online' ? 'just now' : '4h ago'}
+                      {a.status === 'online' ? 'just now' : (a.lastHeartbeat ? new Date(a.lastHeartbeat).toLocaleTimeString() : 'never')}
                     </span>
                   </div>
                 </div>
@@ -256,7 +255,10 @@ export const Agents: React.FC = () => {
                 <p className="text-[10px] text-zinc-500 font-mono">Install client agent inside your host machine</p>
               </div>
               <button 
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setCreatedAgent(null);
+                }}
                 className="text-xs font-mono text-zinc-550 hover:text-zinc-350 cursor-pointer"
               >
                 close
@@ -264,54 +266,72 @@ export const Agents: React.FC = () => {
             </div>
 
             <div className="p-6 space-y-5 text-left">
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                To connect a self-hosted server runner node, initialize Docker on the machine and execute our setup installation shell command.
-              </p>
+              {!createdAgent ? (
+                <>
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    To connect a self-hosted server runner node, provision it here to receive an installation token.
+                  </p>
+                  
+                  <form onSubmit={handleRegisterAgent} className="space-y-4">
+                    <div className="space-y-1 font-mono text-[10px]">
+                      <span className="font-bold text-zinc-500">RUNNER NAME</span>
+                      <input 
+                        name="name"
+                        type="text" 
+                        required
+                        placeholder="eu-west-runner-01"
+                        className="w-full h-9 px-2.5 rounded bg-zinc-950 border border-zinc-800 text-xs text-zinc-200 placeholder-zinc-700 focus:outline-none"
+                      />
+                    </div>
+                    
+                    <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800 mt-6">
+                      <button
+                        type="submit"
+                        disabled={addAgentMutation.isPending}
+                        className="h-9 px-4 rounded-lg text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-zinc-950 shadow-lg shadow-emerald-500/5 transition cursor-pointer font-mono disabled:opacity-50"
+                      >
+                        {addAgentMutation.isPending ? 'PROVISIONING...' : 'PROVISION RUNNER'}
+                      </button>
+                    </div>
+                  </form>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    Runner <strong>{createdAgent.name}</strong> created! Run the script below on your host machine to connect the agent daemon.
+                  </p>
 
-              {/* Install Terminal script box */}
-              <div className="space-y-1.5 font-mono">
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold text-zinc-550">SHELL SCRIPT CMD</span>
-                  <button 
-                    onClick={handleCopyInstallCmd}
-                    className="text-[10px] text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer font-bold"
-                  >
-                    <Copy className="w-3 h-3" />
-                    {copiedText ? 'copied!' : 'copy command'}
-                  </button>
-                </div>
-                
-                <div className="p-3 bg-zinc-950 rounded-lg border border-zinc-850/80 text-[11px] text-zinc-300 break-all select-text font-mono leading-relaxed">
-                  <code>curl -fsSL https://get.infra-cd.dev/agent.sh | sh -s -- --token icd_tok_84a2f8b0ea12 --server https://console.infra-cd.dev</code>
-                </div>
-              </div>
+                  {/* Install Terminal script box */}
+                  <div className="space-y-1.5 font-mono">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-bold text-zinc-550">SHELL SCRIPT CMD</span>
+                      <button 
+                        onClick={handleCopyInstallCmd}
+                        className="text-[10px] text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer font-bold"
+                      >
+                        <Copy className="w-3 h-3" />
+                        {copiedText ? 'copied!' : 'copy command'}
+                      </button>
+                    </div>
+                    
+                    <div className="p-3 bg-zinc-950 rounded-lg border border-zinc-850/80 text-[11px] text-zinc-300 break-all select-text font-mono leading-relaxed">
+                      <code>{`curl -fsSL https://get.infra-cd.dev/agent.sh | sh -s -- --token ${createdAgent.token} --server ${window.location.origin}`}</code>
+                    </div>
+                  </div>
 
-              {/* Setup requirements */}
-              <div className="space-y-2 p-4 bg-zinc-950 rounded-lg border border-zinc-850/50 text-[10px] font-mono text-zinc-500">
-                <span className="font-bold text-zinc-400 block pb-1 border-b border-zinc-900">Runner host specs requirements</span>
-                <div className="flex justify-between">
-                  <span>Operating System:</span>
-                  <span className="text-zinc-300">Linux (amd64 / arm64)</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Minimum CPU/RAM:</span>
-                  <span className="text-zinc-300">1 Core // 1GB Ram</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Engine dependency:</span>
-                  <span className="text-zinc-300">Docker Daemon running</span>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800 mt-6 font-mono">
-                <button
-                  onClick={handleRegisterAgent}
-                  className="h-9 px-4 rounded-lg text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-zinc-950 shadow-lg shadow-emerald-500/5 transition cursor-pointer"
-                >
-                  SIMULATE CLONE RUNNER NODE
-                </button>
-              </div>
-            </div>
+                  <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800 mt-6 font-mono">
+                    <button
+                      onClick={() => {
+                        setIsModalOpen(false);
+                        setCreatedAgent(null);
+                      }}
+                      className="h-9 px-4 rounded-lg text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition cursor-pointer"
+                    >
+                      DONE
+                    </button>
+                  </div>
+                </>
+              )}
           </div>
         </div>
       )}

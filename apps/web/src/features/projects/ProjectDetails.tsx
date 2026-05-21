@@ -96,7 +96,7 @@ export const ProjectDetails: React.FC = () => {
   });
 
   // Query Project details
-  const { data: project, isLoading: isProjectLoading, error: projectError } = useQuery<Project>({
+  const { data: projectBase, isLoading: isProjectLoading, error: projectError } = useQuery<Project>({
     queryKey: ['project', id],
     queryFn: async () => {
       const res = await apiClient.get(`/projects/${id}`);
@@ -104,6 +104,26 @@ export const ProjectDetails: React.FC = () => {
     },
     enabled: !!id,
   });
+
+  const { data: envVars = [] } = useQuery({
+    queryKey: ['project-env', id],
+    queryFn: async () => {
+      const res = await apiClient.get(`/projects/${id}/env`);
+      return res.data;
+    },
+    enabled: !!id,
+  });
+
+  const { data: webhooks = [] } = useQuery({
+    queryKey: ['project-webhooks', id],
+    queryFn: async () => {
+      const res = await apiClient.get(`/projects/${id}/webhooks`);
+      return res.data;
+    },
+    enabled: !!id,
+  });
+
+  const project = projectBase ? { ...projectBase, envVars, webhooks } : undefined;
 
   // Query Project Deployments
   const { data: deployments = [] } = useQuery<Deployment[]>({
@@ -137,10 +157,10 @@ export const ProjectDetails: React.FC = () => {
   // Env Var mutations
   const addEnvVarMutation = useMutation({
     mutationFn: async (data: EnvVarForm) => {
-      return apiClient.post(`/projects/${id}/env-vars`, data);
+      return apiClient.post(`/projects/${id}/env`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      queryClient.invalidateQueries({ queryKey: ['project-env', id] });
       notification.success('Variable Saved', 'Environment variable registered.');
       resetEnv();
     }
@@ -148,10 +168,10 @@ export const ProjectDetails: React.FC = () => {
 
   const deleteEnvVarMutation = useMutation({
     mutationFn: async (varId: string) => {
-      return apiClient.delete(`/projects/${id}/env-vars/${varId}`);
+      return apiClient.delete(`/projects/${id}/env/${varId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      queryClient.invalidateQueries({ queryKey: ['project-env', id] });
       notification.warning('Variable Deleted', 'Secret deleted from configurations.');
     }
   });
@@ -162,7 +182,7 @@ export const ProjectDetails: React.FC = () => {
       return apiClient.post(`/projects/${id}/webhooks`, { ...data, events: ['push', 'deployment.success', 'deployment.failed'] });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      queryClient.invalidateQueries({ queryKey: ['project-webhooks', id] });
       notification.success('Webhook Added', 'Listening endpoint registered.');
       resetWeb();
     }
@@ -173,7 +193,7 @@ export const ProjectDetails: React.FC = () => {
       return apiClient.delete(`/projects/${id}/webhooks/${webId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      queryClient.invalidateQueries({ queryKey: ['project-webhooks', id] });
       notification.warning('Webhook Deleted', 'Listening endpoint unregistered.');
     }
   });

@@ -38,6 +38,12 @@ func GetAgentByID(id uuid.UUID) (models.Agent, error) {
 	return agent, err
 }
 
+func VerifyAgent(token string) (models.Agent, error) {
+	var agent models.Agent
+	err := db.DB.First(&agent, "token = ?", token).Error
+	return agent, err
+}
+
 func GetAgentByToken(token string) (models.Agent, error) {
 	var agent models.Agent
 	err := db.DB.First(&agent, "token = ?", token).Error

@@ -136,10 +136,11 @@ func main() {
 	// Agents
 	agents := api.Group("/agents")
 	{
-		agents.GET("", handlers.ListAgents)
-		agents.POST("", handlers.CreateAgent)
-		agents.GET("/:id", handlers.GetAgentByID)
-		agents.DELETE("/:id", handlers.DeleteAgent)
+		api.GET("/agents", handlers.ListAgents)
+		api.POST("/agents", handlers.CreateAgent)
+		api.GET("/agents/verify", handlers.VerifyAgent)
+		api.GET("/agents/:id", handlers.GetAgentByID)
+		api.DELETE("/agents/:id", handlers.DeleteAgent)
 		agents.POST("/:id/heartbeat", handlers.Heartbeat)
 		agents.GET("/:id/pending-deployments", handlers.GetPendingDeployments)
 	}

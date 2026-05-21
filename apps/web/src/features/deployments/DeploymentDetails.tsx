@@ -11,9 +11,8 @@ import {
   CheckCircle,
   XCircle
 } from 'lucide-react';
-import { apiClient } from '../../api';
+import { API_URL, apiClient } from '../../api';
 import { Terminal } from '../../components/terminal/Terminal';
-import { useWebSocket } from '../../hooks/useWebSocket';
 import { useNotification } from '../../hooks/useNotification';
 import type { Deployment, DeploymentStep } from '../../types';
 
@@ -22,10 +21,9 @@ export const DeploymentDetails: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const notification = useNotification();
-  const { runDeploymentSimulation } = useWebSocket();
 
   const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
-  const simulationCleanupRef = useRef<(() => void) | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   // Query Deployment details
   const { data: deployment, isLoading, error } = useQuery<Deployment>({
@@ -61,45 +59,52 @@ export const DeploymentDetails: React.FC = () => {
     }
   });
 
-  // Manage Live Simulation Streaming
+  // Manage Live SSE Streaming
   useEffect(() => {
     if (!deployment || !id) return;
 
-    // Reset logs
-    setTerminalLogs([]);
-
-    // If deployment is running or pending, we spin up the websocket simulation
-    if (deployment.status === 'pending' || deployment.status === 'running') {
-      const onLine = (line: string) => {
-        setTerminalLogs((prev) => [...prev, line]);
-      };
-
-      const onStepChange = () => {
-        // Invalidate deployment state to update steps duration/status
-        queryClient.invalidateQueries({ queryKey: ['deployment', id] });
-      };
-
-      // Start log streaming simulation
-      const cleanup = runDeploymentSimulation(id, onLine, onStepChange);
-      simulationCleanupRef.current = cleanup;
-
-      return () => {
-        if (simulationCleanupRef.current) {
-          simulationCleanupRef.current();
-          simulationCleanupRef.current = null;
-        }
-      };
-    } else {
-      // Replay all steps logs instantly
+    // We can show previously recorded logs by iterating over steps
+    if (deployment.status === 'success' || deployment.status === 'failed') {
       const logsToFeed: string[] = [];
-      deployment.steps.forEach((step) => {
-        logsToFeed.push(`\x1b[1m\x1b[36m--- Step: ${step.name} ---\x1b[0m`);
-        step.logs.forEach((line) => logsToFeed.push(line));
-        logsToFeed.push('');
-      });
+      if (deployment.Steps) {
+        deployment.Steps.forEach((step) => {
+          logsToFeed.push(`\x1b[1m\x1b[36m--- Step: ${step.name} ---\x1b[0m\r\n`);
+          if (step.output) {
+            logsToFeed.push(step.output.replace(/\n/g, '\r\n') + '\r\n');
+          }
+        });
+      }
       setTerminalLogs(logsToFeed);
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    // Connect to SSE stream
+    setTerminalLogs([]);
+    const es = new EventSource(`${API_URL}/api/v1/deployments/${id}/logs/stream`);
+    eventSourceRef.current = es;
+
+    es.addEventListener('log', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        const prefix = data.type === 'stderr' ? '\x1b[31m' : '';
+        const suffix = data.type === 'stderr' ? '\x1b[0m' : '';
+        setTerminalLogs((prev) => [...prev, `${prefix}${data.message}${suffix}\r\n`]);
+      } catch (err) {
+        console.error('Failed to parse log event', err);
+      }
+    });
+
+    es.addEventListener('done', () => {
+      es.close();
+      queryClient.invalidateQueries({ queryKey: ['deployment', id] });
+    });
+
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+    };
   }, [id, deployment?.id, deployment?.status]);
 
   if (isLoading) {
@@ -227,7 +232,7 @@ export const DeploymentDetails: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            {deployment.steps.map((step) => {
+            {(deployment.Steps || deployment.steps || []).map((step) => {
               const isRunning = step.status === 'running';
               const isSuccess = step.status === 'success';
               const isFailed = step.status === 'failed';
