@@ -15,12 +15,13 @@ import {
   Radio,
   Copy,
   Clock,
-  User
+  User,
+  Server
 } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import { apiClient } from '../../api';
 import { StatusBadge } from '../../components/common/Metrics';
-import type { Project, Deployment } from '../../types';
+import type { Project, Deployment, Agent } from '../../types';
 import { useNotification } from '../../hooks/useNotification';
 
 // Zod schemas for env vars and webhooks forms
@@ -131,6 +132,25 @@ export const ProjectDetails: React.FC = () => {
     },
     enabled: !!id,
     refetchInterval: 3000, // Sync build list dynamically
+  });
+
+  // Query Agents for pinning
+  const { data: agents = [] } = useQuery<Agent[]>({
+    queryKey: ['agents-list'],
+    queryFn: async () => {
+      const res = await apiClient.get('/agents');
+      return res.data;
+    }
+  });
+
+  const updateAgentMutation = useMutation({
+    mutationFn: async (agentId: string | null) => {
+      return apiClient.put(`/projects/${id}`, { agent_id: agentId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      notification.success('Affinity Updated', 'Runner assignment saved.');
+    }
   });
 
   // Trigger Deployment mutation
@@ -660,6 +680,26 @@ export const ProjectDetails: React.FC = () => {
     return (
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-6 font-mono text-xs">
         <h3 className="text-sm font-bold text-zinc-200 mb-4 border-b border-zinc-800 pb-2.5 font-sans">Project Environment Settings</h3>
+
+        {/* Agent Pinning Section */}
+        <div className="p-4 bg-zinc-950 border border-zinc-850 rounded-xl space-y-3">
+          <h4 className="text-sm font-bold text-zinc-300 flex items-center gap-1.5 font-sans">
+            <Server className="w-4 h-4" /> Agent Affinity (Node Pinning)
+          </h4>
+          <p className="text-zinc-500 leading-relaxed font-sans text-xs">
+            Lock this project to a specific runner agent node. If pinned, only that specific server will ever execute pipelines for this project.
+          </p>
+          <select 
+            value={project.agent_id || ''}
+            onChange={(e) => updateAgentMutation.mutate(e.target.value || null)}
+            className="w-full max-w-sm h-9 px-2 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 focus:outline-none"
+          >
+            <option value="">Any Agent (Cluster Pool)</option>
+            {agents.map(a => (
+              <option key={a.id} value={a.id}>{a.name} ({a.status})</option>
+            ))}
+          </select>
+        </div>
 
         <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-xl space-y-3">
           <h4 className="text-sm font-bold text-red-400 flex items-center gap-1.5 font-sans">

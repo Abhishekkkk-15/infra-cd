@@ -64,12 +64,16 @@ func UpdateProject(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project id"})
 		return
 	}
-	var updates models.Project
+	var updates map[string]interface{}
 	if err := c.ShouldBindJSON(&updates); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	project, err := services.UpdateProject(id, &updates)
+	
+	// Ensure ID is not updated
+	delete(updates, "id")
+
+	project, err := services.UpdateProject(id, updates)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

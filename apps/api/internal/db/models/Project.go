@@ -13,6 +13,7 @@ type Project struct {
 	DockerfilePath       string                 `json:"dockerfile_path"`
 	DeployScript         string                 `gorm:"type:text" json:"deploy_script"`
 	UserID               uuid.UUID              `json:"user_id"`
+	AgentID              *uuid.UUID             `json:"agent_id"`
 	BaseModel
 	Deployment           []Deployment           `gorm:"constraint:OnDelete:CASCADE;" json:"-"`
 	EnvironmentVariables []EnvironmentVariable  `gorm:"constraint:OnDelete:CASCADE;" json:"-"`

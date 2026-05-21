@@ -51,6 +51,7 @@ export interface Project {
   dockerfile_path: string;
   deploy_script: string;
   user_id: string;
+  agent_id?: string;
   created_at: string;
   updated_at: string;
 

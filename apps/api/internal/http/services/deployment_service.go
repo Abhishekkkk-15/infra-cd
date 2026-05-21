@@ -22,17 +22,21 @@ func TriggerDeployment(projectID uuid.UUID) (models.Deployment, error) {
 		return models.Deployment{}, fmt.Errorf("project not found: %w", err)
 	}
 
-	// Try to pick an online agent
-	var agent models.Agent
-	agentErr := db.DB.Where("status = ?", models.AgentOnline).First(&agent).Error
-
 	d := models.Deployment{
 		ProjectID: projectID,
 		Status:    models.DeploymentPending,
 		Branch:    project.Branch,
 	}
-	if agentErr == nil {
-		d.AgentID = &agent.ID
+
+	if project.AgentID != nil {
+		// Pin to specific agent
+		d.AgentID = project.AgentID
+	} else {
+		// Try to pick an online agent from the pool
+		var agent models.Agent
+		if err := db.DB.Where("status = ?", models.AgentOnline).First(&agent).Error; err == nil {
+			d.AgentID = &agent.ID
+		}
 	}
 
 	if err := db.DB.Create(&d).Error; err != nil {

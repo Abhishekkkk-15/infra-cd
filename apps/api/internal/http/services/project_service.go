@@ -23,7 +23,7 @@ func GetProjectByID(id string) (models.Project, error) {
 	return project, err
 }
 
-func UpdateProject(id uuid.UUID, updates *models.Project) (models.Project, error) {
+func UpdateProject(id uuid.UUID, updates map[string]interface{}) (models.Project, error) {
 	var project models.Project
 	if err := db.DB.First(&project, "id = ?", id).Error; err != nil {
 		return project, err
