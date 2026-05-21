@@ -61,25 +61,45 @@ func RunDeployment(c *client.Client, d client.Deployment) error {
 		}
 	}
 
-	// 4. Execute build/deploy script
-	if d.Project.IsDockerized {
-		ctx.logInfo("Detected dockerized project, running docker build/compose...")
-		// Use the deploy_script if provided, else fallback to docker compose up
-		script := d.Project.DeployScript
-		if script == "" {
-			script = "docker-compose up -d --build"
+	// 4. Execute pipeline or fallback deploy script
+	configPath := filepath.Join(workDir, ".infra-cd.yaml")
+	if _, err := os.Stat(configPath); err == nil {
+		ctx.logInfo("Found .infra-cd.yaml, parsing pipeline configuration...")
+		config, err := ParsePipelineConfig(configPath)
+		if err != nil {
+			return fmt.Errorf("invalid pipeline config: %v", err)
 		}
-		if err := ctx.runScript(workDir, script, envList); err != nil {
-			return fmt.Errorf("docker deploy failed: %v", err)
+
+		if len(config.Jobs) == 0 {
+			ctx.logInfo("No jobs defined in pipeline config.")
+		}
+
+		for _, job := range config.Jobs {
+			ctx.logInfo(fmt.Sprintf("--- Running Job: %s ---", job.Name))
+			if err := ctx.runScript(workDir, job.Script, envList); err != nil {
+				return fmt.Errorf("job '%s' failed: %v", job.Name, err)
+			}
 		}
 	} else {
-		ctx.logInfo("Running shell deploy script...")
-		script := d.Project.DeployScript
-		if script == "" {
-			script = "./deploy.sh"
-		}
-		if err := ctx.runScript(workDir, script, envList); err != nil {
-			return fmt.Errorf("shell deploy failed: %v", err)
+		// Fallback to legacy deploy script logic
+		if d.Project.IsDockerized {
+			ctx.logInfo("Detected dockerized project, running docker build/compose...")
+			script := d.Project.DeployScript
+			if script == "" {
+				script = "docker-compose up -d --build"
+			}
+			if err := ctx.runScript(workDir, script, envList); err != nil {
+				return fmt.Errorf("docker deploy failed: %v", err)
+			}
+		} else {
+			ctx.logInfo("Running shell deploy script...")
+			script := d.Project.DeployScript
+			if script == "" {
+				script = "./deploy.sh"
+			}
+			if err := ctx.runScript(workDir, script, envList); err != nil {
+				return fmt.Errorf("shell deploy failed: %v", err)
+			}
 		}
 	}
 
