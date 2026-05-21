@@ -7,6 +7,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/mem"
+
 	"github.com/abhishekkkk-15/infra-cd/agent/internal/client"
 	"github.com/abhishekkkk-15/infra-cd/agent/internal/runner"
 )
@@ -43,7 +46,16 @@ func main() {
 	// 2. Start heartbeat goroutine
 	go func() {
 		for {
-			err := apiClient.SendHeartbeat(agent.ID)
+			var cpuUsage float64
+			if percentages, err := cpu.Percent(0, false); err == nil && len(percentages) > 0 {
+				cpuUsage = percentages[0]
+			}
+			var ramUsage float64
+			if v, err := mem.VirtualMemory(); err == nil {
+				ramUsage = v.UsedPercent
+			}
+
+			err := apiClient.SendHeartbeat(agent.ID, cpuUsage, ramUsage)
 			if err != nil {
 				log.Printf("Heartbeat failed: %v", err)
 			}

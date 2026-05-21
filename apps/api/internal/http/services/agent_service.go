@@ -54,13 +54,15 @@ func DeleteAgent(id uuid.UUID) error {
 	return db.DB.Delete(&models.Agent{}, "id = ?", id).Error
 }
 
-func RecordHeartbeat(id uuid.UUID) error {
+func RecordHeartbeat(id uuid.UUID, cpu, ram float64) error {
 	now := time.Now()
 	res := db.DB.Model(&models.Agent{}).
 		Where("id = ?", id).
 		Updates(map[string]interface{}{
 			"last_heartbeat": now,
 			"status":         models.AgentOnline,
+			"cpu_usage":      cpu,
+			"ram_usage":      ram,
 		})
 	if res.Error != nil {
 		return res.Error

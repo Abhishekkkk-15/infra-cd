@@ -8,8 +8,9 @@ import (
 )
 
 type PipelineConfig struct {
-	Version string `yaml:"version"`
-	Jobs    []Job  `yaml:"jobs"`
+	Version string   `yaml:"version"`
+	Cache   []string `yaml:"cache"`
+	Jobs    []Job    `yaml:"jobs"`
 }
 
 type Job struct {

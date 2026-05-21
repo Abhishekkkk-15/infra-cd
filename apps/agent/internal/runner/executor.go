@@ -61,7 +61,13 @@ func RunDeployment(c *client.Client, d client.Deployment) error {
 		}
 	}
 
-	// 4. Execute pipeline or fallback deploy script
+	// 4. Restore Cache
+	ctx.logInfo("Restoring cached dependencies (if any)...")
+	if err := extractCache(d.ProjectID, workDir); err != nil {
+		ctx.logError(fmt.Sprintf("Cache restoration warning: %v", err))
+	}
+
+	// 5. Execute pipeline or fallback deploy script
 	configPath := filepath.Join(workDir, ".infra-cd.yaml")
 	if _, err := os.Stat(configPath); err == nil {
 		ctx.logInfo("Found .infra-cd.yaml, parsing pipeline configuration...")
@@ -78,6 +84,13 @@ func RunDeployment(c *client.Client, d client.Deployment) error {
 			ctx.logInfo(fmt.Sprintf("--- Running Job: %s ---", job.Name))
 			if err := ctx.runScript(workDir, job.Script, envList); err != nil {
 				return fmt.Errorf("job '%s' failed: %v", job.Name, err)
+			}
+		}
+
+		if len(config.Cache) > 0 {
+			ctx.logInfo("Saving cache for specified directories...")
+			if err := saveCache(d.ProjectID, workDir, config.Cache); err != nil {
+				ctx.logError(fmt.Sprintf("Failed to save cache: %v", err))
 			}
 		}
 	} else {

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  Server, 
-  Plus, 
+import {
+  Server,
+  Plus,
   Copy,
   Trash2
 } from 'lucide-react';
@@ -90,7 +90,7 @@ export const Agents: React.FC = () => {
 
   return (
     <div className="space-y-6 font-sans select-none">
-      
+
       {/* Title Header */}
       <div className="flex items-center justify-between border-b border-zinc-900 pb-5">
         <div>
@@ -146,7 +146,7 @@ export const Agents: React.FC = () => {
               .slice(0, 3);
 
             return (
-              <div 
+              <div
                 key={a.id}
                 className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 flex flex-col justify-between space-y-5"
               >
@@ -184,12 +184,12 @@ export const Agents: React.FC = () => {
                     <div className="space-y-2 p-3 bg-zinc-950/60 rounded-lg border border-zinc-850">
                       <div className="flex justify-between font-bold">
                         <span>CPU CORE LOAD</span>
-                        <span className="text-zinc-300">14%</span>
+                        <span className="text-zinc-300">{Math.round((a as any).cpuUsage || 0)}%</span>
                       </div>
                       <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full transition-all duration-500 bg-emerald-400`}
-                          style={{ width: `14%` }}
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${Math.round((a as any).cpuUsage || 0) > 75 ? 'bg-rose-500' : 'bg-emerald-400'}`}
+                          style={{ width: `${Math.round((a as any).cpuUsage || 0)}%` }}
                         />
                       </div>
                     </div>
@@ -197,12 +197,12 @@ export const Agents: React.FC = () => {
                     <div className="space-y-2 p-3 bg-zinc-950/60 rounded-lg border border-zinc-850">
                       <div className="flex justify-between font-bold">
                         <span>MEMORY RAM LOAD</span>
-                        <span className="text-zinc-300">42%</span>
+                        <span className="text-zinc-300">{Math.round((a as any).ramUsage || 0)}%</span>
                       </div>
                       <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                        <div 
+                        <div
                           className="h-full bg-indigo-500 rounded-full transition-all duration-500"
-                          style={{ width: `42%` }}
+                          style={{ width: `${Math.round((a as any).ramUsage || 0)}%` }}
                         />
                       </div>
                     </div>
@@ -246,17 +246,16 @@ export const Agents: React.FC = () => {
                         <div key={j.id} className="flex items-center justify-between p-2 bg-zinc-950 border border-zinc-850/40 rounded text-[9px] font-mono">
                           <div className="flex items-center gap-2 truncate">
                             <span className="text-zinc-400 font-semibold truncate max-w-[80px]">{(j as any).Project?.name || 'project'}</span>
-                            <span className="text-zinc-550">[{j.commit_sha ? j.commit_sha.substring(0,7) : 'N/A'}]</span>
+                            <span className="text-zinc-550">[{j.commit_sha ? j.commit_sha.substring(0, 7) : 'N/A'}]</span>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <span className="text-zinc-500">
-                              {j.started_at && j.finished_at 
-                                ? Math.round((new Date(j.finished_at).getTime() - new Date(j.started_at).getTime()) / 1000) + 's' 
+                              {j.started_at && j.finished_at
+                                ? Math.round((new Date(j.finished_at).getTime() - new Date(j.started_at).getTime()) / 1000) + 's'
                                 : '-'}
                             </span>
-                            <span className={`w-1.5 h-1.5 rounded-full ${
-                              j.status === 'success' ? 'bg-emerald-500' : 'bg-rose-500'
-                            }`} />
+                            <span className={`w-1.5 h-1.5 rounded-full ${j.status === 'success' ? 'bg-emerald-500' : 'bg-rose-500'
+                              }`} />
                           </div>
                         </div>
                       ))}
@@ -274,7 +273,7 @@ export const Agents: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           {/* Backdrop */}
           <div className="fixed inset-0 bg-zinc-950/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}></div>
-          
+
           {/* Panel */}
           <div className="w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden relative z-10 font-sans">
             <div className="px-6 py-4 border-b border-zinc-800 bg-zinc-900 flex justify-between items-center">
@@ -282,7 +281,7 @@ export const Agents: React.FC = () => {
                 <h3 className="text-sm font-bold text-zinc-100">Provision Runner Node</h3>
                 <p className="text-[10px] text-zinc-500 font-mono">Install client agent inside your host machine</p>
               </div>
-              <button 
+              <button
                 onClick={() => {
                   setIsModalOpen(false);
                   setCreatedAgent(null);
@@ -299,19 +298,19 @@ export const Agents: React.FC = () => {
                   <p className="text-xs text-zinc-400 leading-relaxed">
                     To connect a self-hosted server runner node, provision it here to receive an installation token.
                   </p>
-                  
+
                   <form onSubmit={handleRegisterAgent} className="space-y-4">
                     <div className="space-y-1 font-mono text-[10px]">
                       <span className="font-bold text-zinc-500">RUNNER NAME</span>
-                      <input 
+                      <input
                         name="name"
-                        type="text" 
+                        type="text"
                         required
                         placeholder="eu-west-runner-01"
                         className="w-full h-9 px-2.5 rounded bg-zinc-950 border border-zinc-800 text-xs text-zinc-200 placeholder-zinc-700 focus:outline-none"
                       />
                     </div>
-                    
+
                     <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800 mt-6">
                       <button
                         type="submit"
@@ -333,7 +332,7 @@ export const Agents: React.FC = () => {
                   <div className="space-y-1.5 font-mono">
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] font-bold text-zinc-550">SHELL SCRIPT CMD</span>
-                      <button 
+                      <button
                         onClick={handleCopyInstallCmd}
                         className="text-[10px] text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer font-bold"
                       >
@@ -341,7 +340,7 @@ export const Agents: React.FC = () => {
                         {copiedText ? 'copied!' : 'copy command'}
                       </button>
                     </div>
-                    
+
                     <div className="p-3 bg-zinc-950 rounded-lg border border-zinc-850/80 text-[11px] text-zinc-300 break-all select-text font-mono leading-relaxed">
                       <code>{`curl -fsSL https://get.infra-cd.dev/agent.sh | sh -s -- --token ${createdAgent.token} --server ${window.location.origin}`}</code>
                     </div>

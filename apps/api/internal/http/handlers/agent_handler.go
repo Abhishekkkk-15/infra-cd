@@ -91,7 +91,14 @@ func Heartbeat(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid agent id"})
 		return
 	}
-	if err := services.RecordHeartbeat(id); err != nil {
+
+	var req struct {
+		CpuUsage float64 `json:"cpuUsage"`
+		RamUsage float64 `json:"ramUsage"`
+	}
+	c.ShouldBindJSON(&req)
+
+	if err := services.RecordHeartbeat(id, req.CpuUsage, req.RamUsage); err != nil {
 		if err.Error() == "agent not found" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "agent not found or deleted"})
 			return

@@ -21,6 +21,8 @@ type Agent struct {
 	IP            string      `json:"ip"`
 	Status        AgentStatus `json:"status"`
 	LastHeartbeat *time.Time  `json:"last_heartbeat"`
+	CpuUsage      float64     `json:"cpuUsage"`
+	RamUsage      float64     `json:"ramUsage"`
 	BaseModel
 	Deployments []Deployment `gorm:"constraint:OnDelete:SET NULL;" json:"-"`
 }

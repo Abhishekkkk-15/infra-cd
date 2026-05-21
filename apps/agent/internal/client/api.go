@@ -59,8 +59,13 @@ func (c *Client) VerifyAgent() (*Agent, error) {
 	return &result, nil
 }
 
-func (c *Client) SendHeartbeat(agentID string) error {
-	resp, err := c.resty.R().Post(fmt.Sprintf("/agents/%s/heartbeat", agentID))
+func (c *Client) SendHeartbeat(agentID string, cpuUsage, ramUsage float64) error {
+	resp, err := c.resty.R().
+		SetBody(map[string]float64{
+			"cpuUsage": cpuUsage,
+			"ramUsage": ramUsage,
+		}).
+		Post(fmt.Sprintf("/agents/%s/heartbeat", agentID))
 	if err != nil {
 		return err
 	}

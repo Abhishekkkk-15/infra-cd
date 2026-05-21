@@ -55,10 +55,11 @@ export const Dashboard: React.FC = () => {
       const allDeploys: Deployment[] = [];
       for (const p of res.data) {
         const dRes = await apiClient.get(`/projects/${p.id}/deployments`);
-        allDeploys.push(...dRes.data);
+        const deps = dRes.data.map((d: any) => ({ ...d, Project: p }));
+        allDeploys.push(...deps);
       }
       return allDeploys
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .sort((a: any, b: any) => new Date(b.created_at || new Date()).getTime() - new Date(a.created_at || new Date()).getTime())
         .slice(0, 5);
     },
     refetchInterval: 4000,
@@ -271,19 +272,23 @@ export const Dashboard: React.FC = () => {
                       className="hover:bg-zinc-850/30 transition cursor-pointer"
                       onClick={() => navigate(`/deployments/${d.id}`)}
                     >
-                      <td className="py-3 font-semibold text-zinc-300 font-sans">{d.projectName}</td>
+                      <td className="py-3 font-semibold text-zinc-300 font-sans">{(d as any).Project?.name || 'Project'}</td>
                       <td className="py-3">
                         <div className="flex flex-col">
-                          <span className="text-zinc-200">[{d.commitHash}]</span>
-                          <span className="text-[9px] text-zinc-500 font-sans truncate max-w-[150px]">{d.commitMessage}</span>
+                          <span className="text-zinc-200">[{d.commit_sha ? d.commit_sha.substring(0, 7) : 'N/A'}]</span>
+                          <span className="text-[9px] text-zinc-500 font-sans truncate max-w-[150px]">{d.commit_message || 'Manual Deployment'}</span>
                         </div>
                       </td>
                       <td className="py-3">
                         <StatusBadge status={d.status} />
                       </td>
-                      <td className="py-3 text-zinc-300">{d.durationSeconds}s</td>
-                      <td className="py-3 text-zinc-500">{d.agentName}</td>
-                      <td className="py-3 text-zinc-500">{d.trigger}</td>
+                      <td className="py-3 text-zinc-300">
+                        {d.started_at && d.finished_at
+                          ? Math.round((new Date(d.finished_at).getTime() - new Date(d.started_at).getTime()) / 1000) + 's'
+                          : '-'}
+                      </td>
+                      <td className="py-3 text-zinc-500">{(d as any).Agent?.name || 'swg'}</td>
+                      <td className="py-3 text-zinc-500">{d.trigger || 'api'}</td>
                     </tr>
                   ))
                 ) : (
@@ -329,12 +334,12 @@ export const Dashboard: React.FC = () => {
                       <div className="space-y-1">
                         <div className="flex justify-between">
                           <span>CPU Usage</span>
-                          <span className="text-zinc-300">{a.cpuUsage}%</span>
+                          <span className="text-zinc-300">{Math.round((a as any).cpuUsage || 0)}%</span>
                         </div>
                         <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
                           <div 
-                            className={`h-full rounded-full transition-all duration-500 ${a.cpuUsage > 75 ? 'bg-rose-500' : 'bg-emerald-400'}`}
-                            style={{ width: `${a.cpuUsage}%` }}
+                            className={`h-full rounded-full transition-all duration-500 ${Math.round((a as any).cpuUsage || 0) > 75 ? 'bg-rose-500' : 'bg-emerald-400'}`}
+                            style={{ width: `${Math.round((a as any).cpuUsage || 0)}%` }}
                           />
                         </div>
                       </div>
@@ -343,20 +348,20 @@ export const Dashboard: React.FC = () => {
                       <div className="space-y-1">
                         <div className="flex justify-between">
                           <span>Memory Usage</span>
-                          <span className="text-zinc-300">{a.ramUsage}%</span>
+                          <span className="text-zinc-300">{Math.round((a as any).ramUsage || 0)}%</span>
                         </div>
                         <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
                           <div 
                             className="h-full bg-indigo-500 rounded-full transition-all duration-500"
-                            style={{ width: `${a.ramUsage}%` }}
+                            style={{ width: `${Math.round((a as any).ramUsage || 0)}%` }}
                           />
                         </div>
                       </div>
 
                       {/* Jobs capacity */}
                       <div className="flex justify-between text-[9px] pt-1">
-                        <span>Jobs running: {a.activeJobsCount} / {a.capacity}</span>
-                        <span>IP: {a.ipAddress}</span>
+                        <span>Jobs running: {a.activeJobsCount || 0} / {a.capacity || 4}</span>
+                        <span>IP: {a.ip || '127.0.0.1'}</span>
                       </div>
                     </div>
                   ) : (
