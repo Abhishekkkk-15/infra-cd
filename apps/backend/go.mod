@@ -1,4 +1,4 @@
-module github.com/sriniously/go-boilerplate
+module github.com/abhishekkkk-15/infra-cd/backend
 
 go 1.24.5
 
