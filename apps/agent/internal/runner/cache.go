@@ -104,6 +104,7 @@ func saveCache(projectID, workDir string, paths []string) error {
 			if err != nil {
 				return err
 			}
+			relPath = filepath.ToSlash(relPath)
 
 			if info.IsDir() {
 				relPath += "/"
