@@ -24,6 +24,31 @@ func ListEnvVars(c *gin.Context) {
 	c.JSON(http.StatusOK, envVars)
 }
 
+// ListEnvVarsAgent handles GET /agents/projects/:projectId/env
+func ListEnvVarsAgent(c *gin.Context) {
+	// Verify Agent Token for security
+	token := c.GetHeader("Authorization")
+	if len(token) > 7 && token[:7] == "Bearer " {
+		token = token[7:]
+	}
+	if _, err := services.VerifyAgent(token); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid agent token"})
+		return
+	}
+
+	projectID, err := uuid.Parse(c.Param("projectId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project id"})
+		return
+	}
+	envVars, err := services.ListEnvVars(projectID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, envVars)
+}
+
 // CreateEnvVar handles POST /projects/:id/env
 func CreateEnvVar(c *gin.Context) {
 	projectID, err := uuid.Parse(c.Param("id"))

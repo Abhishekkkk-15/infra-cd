@@ -6,7 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
+	"runtime"
 	"sync"
 	"time"
 
@@ -108,14 +108,16 @@ func RunDeployment(c *client.Client, d client.Deployment) error {
 }
 
 func (ctx *ExecutionContext) runScript(workDir, script string, envList []string) error {
-	// Simple split by space, for complex scripts we'd use 'sh -c script'
 	var cmd *exec.Cmd
-	if strings.Contains(script, " ") && !strings.HasPrefix(script, "docker") {
-		// e.g. "npm run build && npm start"
-		cmd = exec.Command("sh", "-c", script)
+	if runtime.GOOS == "windows" {
+		scriptPath := filepath.Join(workDir, fmt.Sprintf("step_%d.ps1", time.Now().UnixNano()))
+		psScript := "$ErrorActionPreference = 'Stop'\n" + script
+		if err := os.WriteFile(scriptPath, []byte(psScript), 0755); err != nil {
+			return err
+		}
+		cmd = exec.Command("powershell", "-ExecutionPolicy", "Bypass", "-File", scriptPath)
 	} else {
-		parts := strings.Fields(script)
-		cmd = exec.Command(parts[0], parts[1:]...)
+		cmd = exec.Command("sh", "-e", "-c", script)
 	}
 
 	cmd.Dir = workDir

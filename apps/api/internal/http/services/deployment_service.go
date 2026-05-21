@@ -43,8 +43,11 @@ func TriggerDeployment(projectID uuid.UUID) (models.Deployment, error) {
 		return d, err
 	}
 
-	// Launch runner in background
-	go deployment.Run(d.ID)
+	// Only launch internal legacy runner if no agent is assigned.
+	// Otherwise, let the assigned external agent pull it from the queue.
+	if d.AgentID == nil {
+		go deployment.Run(d.ID)
+	}
 
 	return d, nil
 }

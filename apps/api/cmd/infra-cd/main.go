@@ -11,7 +11,6 @@ import (
 	"time"
 
 	dbpkg "github.com/abhishekkkk-15/infra-cd/api/internal/db"
-	"github.com/abhishekkkk-15/infra-cd/api/internal/db/models"
 	"github.com/abhishekkkk-15/infra-cd/api/internal/http/handlers"
 	"github.com/abhishekkkk-15/infra-cd/api/internal/http/middleware"
 	agentsvc "github.com/abhishekkkk-15/infra-cd/api/internal/http/services"
@@ -36,18 +35,18 @@ func main() {
 	}()
 
 	// Auto-migrate all models
-	if err := dbpkg.AutoMigrate(
-		&models.User{},
-		&models.Agent{},
-		&models.Project{},
-		&models.EnvironmentVariable{},
-		&models.Webhook{},
-		&models.Deployment{},
-		&models.DeploymentStep{},
-		&models.DeploymentLog{},
-	); err != nil {
-		log.Fatalf("failed to auto-migrate: %v", err)
-	}
+	// if err := dbpkg.AutoMigrate(
+	// 	&models.User{},
+	// 	&models.Agent{},
+	// 	&models.Project{},
+	// 	&models.EnvironmentVariable{},
+	// 	&models.Webhook{},
+	// 	&models.Deployment{},
+	// 	&models.DeploymentStep{},
+	// 	&models.DeploymentLog{},
+	// ); err != nil {
+	// 	log.Fatalf("failed to auto-migrate: %v", err)
+	// }
 
 	// Seed Auth
 	if err := agentsvc.InitAuth(); err != nil {
@@ -167,6 +166,7 @@ func main() {
 		agents.GET("/verify", handlers.VerifyAgent)
 		agents.POST("/:id/heartbeat", handlers.Heartbeat)
 		agents.GET("/:id/pending-deployments", handlers.GetPendingDeployments)
+		agents.GET("/projects/:projectId/env", handlers.ListEnvVarsAgent)
 	}
 
 	// System metrics

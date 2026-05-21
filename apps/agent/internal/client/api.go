@@ -121,7 +121,7 @@ func (c *Client) GetProjectEnvVars(projectID string) (map[string]string, error) 
 		Key   string `json:"key"`
 		Value string `json:"value"`
 	}
-	resp, err := c.resty.R().SetResult(&result).Get(fmt.Sprintf("/projects/%s/env", projectID))
+	resp, err := c.resty.R().SetResult(&result).Get(fmt.Sprintf("/agents/projects/%s/env", projectID))
 	if err != nil {
 		return nil, err
 	}
