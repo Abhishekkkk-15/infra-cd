@@ -38,3 +38,14 @@ Environment variables (defaults shown):
 - `DB_SSLMODE` - default `disable`
 - `DB_MAX_OPEN_CONNS`, `DB_MAX_IDLE_CONNS`, `DB_CONN_MAX_LIFETIME_SEC`
 
+## Running migrations
+
+Use the dedicated migration command:
+
+```bash
+cd /d/go/infra-cd/apps/api
+go run ./cmd/migrate
+```
+
+This will open the database connection and run `db.AutoMigrate` for the configured models.
+

@@ -15,6 +15,6 @@ type Project struct {
 	UserID         uuid.UUID `json:"user_id"`
 	BaseModel
 	Deployment           []Deployment
-	EnvironmentVariables []EnvironmentVariables
+	EnvironmentVariables []EnvironmentVariable
 	Webhooks             []Webhook
 }

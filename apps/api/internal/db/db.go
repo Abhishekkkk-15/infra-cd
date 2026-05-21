@@ -22,7 +22,8 @@ func Open(ctx context.Context, cfg *Config) (*gorm.DB, error) {
 	}
 
 	gormConfig := &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		PrepareStmt: true,
+		Logger:      logger.Default.LogMode(logger.Info),
 	}
 
 	dialector := postgres.Open(cfg.DSN)

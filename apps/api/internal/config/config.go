@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/abhishekkkk-15/infra-cd/api/internal/db"
+	"github.com/joho/godotenv"
 )
 
 // Config holds application-level configuration loaded from environment variables.
@@ -25,6 +26,9 @@ type Config struct {
 
 // LoadFromEnv loads configuration from environment variables with sensible defaults.
 func LoadFromEnv() *Config {
+	// Load .env if present so environment variables are available to the app.
+	_ = godotenv.Load()
+
 	cfg := &Config{
 		Port:         getenvDefault("PORT", "8080"),
 		ReadTimeout:  time.Duration(parseEnvInt("SERVER_READ_TIMEOUT_SEC", 5)) * time.Second,
