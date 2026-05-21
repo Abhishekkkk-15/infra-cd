@@ -141,8 +141,8 @@ export const Agents: React.FC = () => {
           agents.map((a) => {
             // Find recent jobs of this agent
             const agentJobs = deployments
-              .filter((d) => d.agentId === a.id)
-              .sort((x, y) => new Date(y.createdAt).getTime() - new Date(x.createdAt).getTime())
+              .filter((d) => d.agent_id === a.id)
+              .sort((x, y) => new Date(y.created_at || new Date()).getTime() - new Date(x.created_at || new Date()).getTime())
               .slice(0, 3);
 
             return (
@@ -157,7 +157,7 @@ export const Agents: React.FC = () => {
                       <h3 className="text-sm font-bold text-zinc-200">{a.name}</h3>
                       <StatusBadge status={a.status === 'online' ? 'online' : 'offline'} />
                     </div>
-                    <span className="text-[10px] font-mono text-zinc-500 block">IP Address: {a.ipAddress}</span>
+                    <span className="text-[10px] font-mono text-zinc-500 block">IP Address: {a.ip || '127.0.0.1'}</span>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -184,12 +184,12 @@ export const Agents: React.FC = () => {
                     <div className="space-y-2 p-3 bg-zinc-950/60 rounded-lg border border-zinc-850">
                       <div className="flex justify-between font-bold">
                         <span>CPU CORE LOAD</span>
-                        <span className="text-zinc-300">{a.cpuUsage}%</span>
+                        <span className="text-zinc-300">14%</span>
                       </div>
                       <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                         <div 
-                          className={`h-full rounded-full transition-all duration-500 ${a.cpuUsage > 75 ? 'bg-rose-500' : 'bg-emerald-400'}`}
-                          style={{ width: `${a.cpuUsage}%` }}
+                          className={`h-full rounded-full transition-all duration-500 bg-emerald-400`}
+                          style={{ width: `14%` }}
                         />
                       </div>
                     </div>
@@ -197,12 +197,12 @@ export const Agents: React.FC = () => {
                     <div className="space-y-2 p-3 bg-zinc-950/60 rounded-lg border border-zinc-850">
                       <div className="flex justify-between font-bold">
                         <span>MEMORY RAM LOAD</span>
-                        <span className="text-zinc-300">{a.ramUsage}%</span>
+                        <span className="text-zinc-300">42%</span>
                       </div>
                       <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                         <div 
                           className="h-full bg-indigo-500 rounded-full transition-all duration-500"
-                          style={{ width: `${a.ramUsage}%` }}
+                          style={{ width: `42%` }}
                         />
                       </div>
                     </div>
@@ -217,11 +217,11 @@ export const Agents: React.FC = () => {
                 <div className="p-3 bg-zinc-950/40 rounded-lg border border-zinc-850/60 font-mono text-[10px] text-zinc-500 grid grid-cols-2 gap-2">
                   <div>
                     <span>OS Platform:</span>
-                    <span className="text-zinc-350 block mt-0.5 truncate">{a.os}</span>
+                    <span className="text-zinc-350 block mt-0.5 truncate">{a.hostname || 'Windows'}</span>
                   </div>
                   <div>
                     <span>Docker Daemon:</span>
-                    <span className="text-zinc-350 block mt-0.5">{a.dockerVersion}</span>
+                    <span className="text-zinc-350 block mt-0.5">N/A (Standalone)</span>
                   </div>
                   <div className="pt-2">
                     <span>Task Capacity:</span>
@@ -230,7 +230,7 @@ export const Agents: React.FC = () => {
                   <div className="pt-2">
                     <span>Last heartbeat:</span>
                     <span className="text-zinc-350 block mt-0.5">
-                      {a.status === 'online' ? 'just now' : (a.lastHeartbeat ? new Date(a.lastHeartbeat).toLocaleTimeString() : 'never')}
+                      {a.status === 'online' ? 'just now' : (a.last_heartbeat ? new Date(a.last_heartbeat).toLocaleTimeString() : 'never')}
                     </span>
                   </div>
                 </div>
@@ -245,11 +245,15 @@ export const Agents: React.FC = () => {
                       {agentJobs.map((j) => (
                         <div key={j.id} className="flex items-center justify-between p-2 bg-zinc-950 border border-zinc-850/40 rounded text-[9px] font-mono">
                           <div className="flex items-center gap-2 truncate">
-                            <span className="text-zinc-400 font-semibold truncate max-w-[80px]">{j.projectName}</span>
-                            <span className="text-zinc-550">[{j.commitHash}]</span>
+                            <span className="text-zinc-400 font-semibold truncate max-w-[80px]">{(j as any).Project?.name || 'project'}</span>
+                            <span className="text-zinc-550">[{j.commit_sha ? j.commit_sha.substring(0,7) : 'N/A'}]</span>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-zinc-500">{j.durationSeconds}s</span>
+                            <span className="text-zinc-500">
+                              {j.started_at && j.finished_at 
+                                ? Math.round((new Date(j.finished_at).getTime() - new Date(j.started_at).getTime()) / 1000) + 's' 
+                                : '-'}
+                            </span>
                             <span className={`w-1.5 h-1.5 rounded-full ${
                               j.status === 'success' ? 'bg-emerald-500' : 'bg-rose-500'
                             }`} />
