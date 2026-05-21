@@ -3,11 +3,11 @@ package models
 import "github.com/google/uuid"
 
 type EnvironmentVariable struct {
-	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	ProjectID uuid.UUID `json:"project_id"`
 	Key       string    `json:"key"`
 	Value     string    `json:"value"`
 	IsSecret  bool      `json:"is_secret"`
 	BaseModel
-	Project Project
+	Project Project `json:"-"`
 }

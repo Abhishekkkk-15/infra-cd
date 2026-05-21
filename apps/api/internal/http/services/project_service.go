@@ -18,8 +18,19 @@ func GetProjects() ([]models.Project, error) {
 
 func GetProjectByID(id string) (models.Project, error) {
 	var project models.Project
-	err := db.DB.Find(&project, "id = ?", id).Error
+	err := db.DB.First(&project, "id = ?", id).Error
 	return project, err
+}
+
+func UpdateProject(id uuid.UUID, updates *models.Project) (models.Project, error) {
+	var project models.Project
+	if err := db.DB.First(&project, "id = ?", id).Error; err != nil {
+		return project, err
+	}
+	if err := db.DB.Model(&project).Updates(updates).Error; err != nil {
+		return project, err
+	}
+	return project, nil
 }
 
 func DeleteProject(id uuid.UUID) error {

@@ -15,6 +15,8 @@ const (
 	DeploymentFailed  DeploymentStatus = "failed"
 )
 
+func (s DeploymentStatus) String() string { return string(s) }
+
 type Deployment struct {
 	ID            uuid.UUID        `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	ProjectID     uuid.UUID        `json:"project_id"`
@@ -25,8 +27,9 @@ type Deployment struct {
 	Branch        string           `json:"branch"`
 	StartedAt     *time.Time       `json:"started_at"`
 	FinishedAt    *time.Time       `json:"finished_at"`
-	Project       Project
-	Agent         Agent
-	logs          []DeploymentLog
-	Steps         []DeploymentStep
+	BaseModel
+	Project Project
+	Agent   Agent
+	Logs    []DeploymentLog
+	Steps   []DeploymentStep
 }

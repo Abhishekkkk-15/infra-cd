@@ -21,11 +21,12 @@ import { useNotification } from '../../hooks/useNotification';
 // Zod validation schema for creating a project
 const projectSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').regex(/^[a-zA-Z0-9-_]+$/, 'Only letters, numbers, dashes, and underscores allowed'),
-  repoUrl: z.string().url('Please enter a valid Git URL (HTTP/HTTPS)'),
+  repo_url: z.string().url('Please enter a valid Git URL (HTTP/HTTPS)'),
   branch: z.string().min(1, 'Branch name is required').default('main'),
-  buildCommand: z.string().min(1, 'Build command is required').default('npm run build'),
-  startCommand: z.string().min(1, 'Start command is required').default('npm start'),
-  isDockerized: z.boolean().default(true),
+  deploy_script: z.string().default(''),
+  is_dockerized: z.boolean().default(true),
+  dockerfile_path: z.string().default('Dockerfile'),
+  description: z.string().default(''),
 });
 
 type ProjectFormFields = z.infer<typeof projectSchema>;
@@ -48,11 +49,12 @@ export const Projects: React.FC = () => {
     resolver: zodResolver(projectSchema),
     defaultValues: {
       name: '',
-      repoUrl: '',
+      repo_url: '',
       branch: 'main',
-      buildCommand: 'npm run build',
-      startCommand: 'npm run dev',
-      isDockerized: true,
+      deploy_script: '',
+      is_dockerized: true,
+      dockerfile_path: 'Dockerfile',
+      description: '',
     }
   });
 
@@ -72,22 +74,17 @@ export const Projects: React.FC = () => {
       return res.data;
     },
     onSuccess: (newProject) => {
-      // Invalidate queries and refetch
       queryClient.invalidateQueries({ queryKey: ['projects-list'] });
       queryClient.invalidateQueries({ queryKey: ['system-metrics'] });
-      
-      // Auto-trigger a first deployment simulation for the project!
-      apiClient.post(`/projects/${newProject.id}/deployments`);
-      
+      // Auto-trigger a first deployment
+      apiClient.post(`/projects/${newProject.id}/deployments`).catch(() => {});
       notification.success('Project Created', `Project "${newProject.name}" has been registered.`);
       setIsModalOpen(false);
       reset();
-      
-      // Redirect to the newly created project details page
       navigate(`/projects/${newProject.id}`);
     },
     onError: (err: unknown) => {
-      const message = err instanceof Error ? err.message : 'Failed to register project.';
+      const message = (err as { message?: string })?.message || 'Failed to register project.';
       notification.error('Error creating project', message);
     }
   });
@@ -121,7 +118,7 @@ export const Projects: React.FC = () => {
 
   const filteredProjects = projects.filter((p) =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.repoUrl.toLowerCase().includes(searchQuery.toLowerCase())
+    (p.repo_url || p.repoUrl || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -210,14 +207,14 @@ export const Projects: React.FC = () => {
                       ? 'bg-blue-500/5 text-blue-400 border-blue-500/10'
                       : 'bg-yellow-500/5 text-yellow-400 border-yellow-500/10'
                   }`}>
-                    {p.isDockerized ? 'Dockerized' : 'Shell Script'}
-                  </span>
-                </div>
+                  {(p.is_dockerized ?? p.isDockerized) ? 'Dockerized' : 'Shell Script'}
+                </span>
+              </div>
 
-                {/* Git repo info */}
-                <div className="flex items-center gap-1 text-[10px] text-zinc-500 font-mono truncate">
-                  <span className="truncate">{p.repoUrl.replace('https://', '')}</span>
-                </div>
+              {/* Git repo info */}
+              <div className="flex items-center gap-1 text-[10px] text-zinc-500 font-mono truncate">
+                <span className="truncate">{(p.repo_url || p.repoUrl || '').replace('https://', '')}</span>
+              </div>
               </div>
 
               {/* Middle Row: Branch & Status */}
@@ -311,13 +308,13 @@ export const Projects: React.FC = () => {
                     Git Repo URL
                   </label>
                   <input
-                    {...register('repoUrl')}
+                    {...register('repo_url')}
                     type="text"
                     placeholder="https://github.com/org/repo"
                     className="w-full h-9 px-3 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-200 placeholder-zinc-650 focus:outline-none focus:border-zinc-700 transition"
                   />
-                  {errors.repoUrl && (
-                    <p className="text-[10px] text-rose-500 font-mono mt-0.5">{errors.repoUrl.message}</p>
+                  {errors.repo_url && (
+                    <p className="text-[10px] text-rose-500 font-mono mt-0.5">{errors.repo_url.message}</p>
                   )}
                 </div>
 
@@ -343,7 +340,7 @@ export const Projects: React.FC = () => {
                       Deployment Type
                     </label>
                     <select
-                      {...register('isDockerized', { setValueAs: (v) => v === 'true' })}
+                      {...register('is_dockerized', { setValueAs: (v) => v === 'true' })}
                       className="w-full h-9 px-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-400 focus:outline-none focus:border-zinc-700 transition"
                     >
                       <option value="true">Docker Container</option>
@@ -352,36 +349,17 @@ export const Projects: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Build Command */}
+                {/* Deploy Script */}
                 <div className="space-y-1">
                   <label className="text-[10px] font-mono font-bold tracking-wider text-zinc-500 uppercase">
-                    Build Command
+                    Deploy Script
                   </label>
                   <input
-                    {...register('buildCommand')}
+                    {...register('deploy_script')}
                     type="text"
-                    placeholder="npm run build"
+                    placeholder="./deploy.sh  or  docker-compose up -d"
                     className="w-full h-9 px-3 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-200 placeholder-zinc-650 focus:outline-none focus:border-zinc-700 transition"
                   />
-                  {errors.buildCommand && (
-                    <p className="text-[10px] text-rose-500 font-mono mt-0.5">{errors.buildCommand.message}</p>
-                  )}
-                </div>
-
-                {/* Start Command */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-mono font-bold tracking-wider text-zinc-500 uppercase">
-                    Start Command
-                  </label>
-                  <input
-                    {...register('startCommand')}
-                    type="text"
-                    placeholder="node dist/index.js"
-                    className="w-full h-9 px-3 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-200 placeholder-zinc-650 focus:outline-none focus:border-zinc-700 transition"
-                  />
-                  {errors.startCommand && (
-                    <p className="text-[10px] text-rose-500 font-mono mt-0.5">{errors.startCommand.message}</p>
-                  )}
                 </div>
 
                 {/* Form Buttons */}

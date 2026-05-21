@@ -14,13 +14,13 @@ const (
 )
 
 type Agent struct {
-	ID            uuid.UUID   `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	ID            uuid.UUID   `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	Name          string      `json:"name"`
 	Token         string      `gorm:"unique" json:"token"`
 	Hostname      string      `json:"hostname"`
-	IP            string      `json:"status"`
+	IP            string      `json:"ip"`
 	Status        AgentStatus `json:"status"`
-	LastHeartbeat *time.Time  `json:"last_hearbeat"`
+	LastHeartbeat *time.Time  `json:"last_heartbeat"`
 	BaseModel
-	Deployments []Deployment
+	Deployments []Deployment `json:"-"`
 }

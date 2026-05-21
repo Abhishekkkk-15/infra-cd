@@ -10,10 +10,10 @@ const (
 )
 
 type DeploymentLog struct {
-	ID           uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	ID           uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	DeploymentID uuid.UUID `json:"deployment_id"`
 	Message      string    `gorm:"type:text" json:"message"`
 	Type         LogType   `json:"type"`
 	BaseModel
-	Deployment Deployment
+	Deployment Deployment `json:"-"`
 }

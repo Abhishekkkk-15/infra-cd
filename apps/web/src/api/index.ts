@@ -5,11 +5,11 @@ import { useProjectStore } from '../store/projectStore';
 import { useAgentStore } from '../store/agentStore';
 
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-const IS_MOCK = true; // Set to true to run fully client-side mock logic
+const IS_MOCK = false; // Set to true to run fully client-side mock logic
 
 // Create core Axios client
 export const apiClient = axios.create({
-  baseURL: `${API_URL}/api`,
+  baseURL: `${API_URL}/api/v1`,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -148,14 +148,19 @@ if (IS_MOCK) {
     }
 
     // --- ENV VAR ROUTES ---
-    const envVarMatch = url.match(/^\/projects\/([^/]+)\/env-vars$/);
+    const envVarMatch = url.match(/^\/projects\/([^/]+)\/env$/);
+    if (envVarMatch && method === 'get') {
+      const projectId = envVarMatch[1];
+      const proj = useProjectStore.getState().projects.find((p) => p.id === projectId);
+      return mockResponse(200, proj?.envVars || []);
+    }
     if (envVarMatch && method === 'post') {
       const projectId = envVarMatch[1];
       const newVar = useProjectStore.getState().addEnvVar(projectId, data);
       return mockResponse(201, newVar);
     }
 
-    const envVarDetailMatch = url.match(/^\/projects\/([^/]+)\/env-vars\/([^/]+)$/);
+    const envVarDetailMatch = url.match(/^\/projects\/([^/]+)\/env\/([^/]+)$/);
     if (envVarDetailMatch && method === 'put') {
       const projectId = envVarDetailMatch[1];
       const varId = envVarDetailMatch[2];
