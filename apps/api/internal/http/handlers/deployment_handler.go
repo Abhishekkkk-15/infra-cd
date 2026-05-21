@@ -138,6 +138,12 @@ func GetPendingDeployments(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid agent id"})
 		return
 	}
+	// Verify agent still exists
+	if _, err := services.GetAgentByID(agentID); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "agent not found or deleted"})
+		return
+	}
+
 	deployments, err := services.GetPendingDeploymentsForAgent(agentID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

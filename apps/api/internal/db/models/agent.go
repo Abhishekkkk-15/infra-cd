@@ -22,5 +22,5 @@ type Agent struct {
 	Status        AgentStatus `json:"status"`
 	LastHeartbeat *time.Time  `json:"last_heartbeat"`
 	BaseModel
-	Deployments []Deployment `json:"-"`
+	Deployments []Deployment `gorm:"constraint:OnDelete:SET NULL;" json:"-"`
 }

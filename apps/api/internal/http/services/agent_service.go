@@ -54,15 +54,21 @@ func DeleteAgent(id uuid.UUID) error {
 	return db.DB.Delete(&models.Agent{}, "id = ?", id).Error
 }
 
-// RecordHeartbeat updates the agent's last_heartbeat and marks it online.
 func RecordHeartbeat(id uuid.UUID) error {
 	now := time.Now()
-	return db.DB.Model(&models.Agent{}).
+	res := db.DB.Model(&models.Agent{}).
 		Where("id = ?", id).
 		Updates(map[string]interface{}{
 			"last_heartbeat": now,
 			"status":         models.AgentOnline,
-		}).Error
+		})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return fmt.Errorf("agent not found")
+	}
+	return nil
 }
 
 // MarkStaleAgentsOffline sets agents offline if no heartbeat in 60s.

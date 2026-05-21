@@ -92,6 +92,10 @@ func Heartbeat(c *gin.Context) {
 		return
 	}
 	if err := services.RecordHeartbeat(id); err != nil {
+		if err.Error() == "agent not found" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "agent not found or deleted"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

@@ -3,7 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Server, 
   Plus, 
-  Copy
+  Copy,
+  Trash2
 } from 'lucide-react';
 import { apiClient } from '../../api';
 import { StatusBadge } from '../../components/common/Metrics';
@@ -51,6 +52,16 @@ export const Agents: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['agents-list'] });
       notification.success('Agent Provisioned', `Runner ${newAgent.name} registered.`);
       setCreatedAgent(newAgent);
+    }
+  });
+
+  const deleteAgentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiClient.delete(`/agents/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agents-list'] });
+      notification.success('Agent Deleted', 'Runner has been removed.');
     }
   });
 
@@ -149,8 +160,21 @@ export const Agents: React.FC = () => {
                     <span className="text-[10px] font-mono text-zinc-500 block">IP Address: {a.ipAddress}</span>
                   </div>
 
-                  <div className="p-2 rounded-lg bg-zinc-950 border border-zinc-850/80 text-zinc-500">
-                    <Server className="w-4 h-4" />
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`Are you sure you want to delete runner ${a.name}?`)) {
+                          deleteAgentMutation.mutate(a.id);
+                        }
+                      }}
+                      className="p-2 rounded-lg bg-zinc-950 border border-zinc-850/80 text-zinc-600 hover:text-red-400 hover:bg-red-500/5 hover:border-red-500/20 transition cursor-pointer"
+                      title="Delete Runner"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <div className="p-2 rounded-lg bg-zinc-950 border border-zinc-850/80 text-zinc-500">
+                      <Server className="w-4 h-4" />
+                    </div>
                   </div>
                 </div>
 
