@@ -14,7 +14,7 @@ type Project struct {
 	DeployScript         string                 `gorm:"type:text" json:"deploy_script"`
 	UserID               uuid.UUID              `json:"user_id"`
 	BaseModel
-	Deployment           []Deployment           `json:"-"`
-	EnvironmentVariables []EnvironmentVariable  `json:"-"`
-	Webhooks             []Webhook              `json:"-"`
+	Deployment           []Deployment           `gorm:"constraint:OnDelete:CASCADE;" json:"-"`
+	EnvironmentVariables []EnvironmentVariable  `gorm:"constraint:OnDelete:CASCADE;" json:"-"`
+	Webhooks             []Webhook              `gorm:"constraint:OnDelete:CASCADE;" json:"-"`
 }
