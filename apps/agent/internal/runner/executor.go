@@ -97,7 +97,7 @@ func (ctx *ExecutionContext) runScript(workDir, script string, envList []string)
 		parts := strings.Fields(script)
 		cmd = exec.Command(parts[0], parts[1:]...)
 	}
-	
+
 	cmd.Dir = workDir
 	return ctx.streamCommand(cmd, envList)
 }
