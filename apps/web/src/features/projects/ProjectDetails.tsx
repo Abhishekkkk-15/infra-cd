@@ -4,14 +4,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { 
-  GitBranch, 
-  ExternalLink, 
-  Play, 
+import {
+  GitBranch,
+  ExternalLink,
+  Play,
   ShieldAlert,
-  Eye, 
-  EyeOff, 
-  Trash2, 
+  Eye,
+  EyeOff,
+  Trash2,
   Radio,
   Copy,
   Clock,
@@ -33,10 +33,7 @@ const envVarSchema = z.object({
 type EnvVarForm = z.infer<typeof envVarSchema>;
 
 const webhookSchema = z.object({
-  name: z.string().min(2, 'Name is required'),
-  url: z.string().url('Please enter a valid webhook URL'),
-  secret: z.string().min(1, 'Webhook secret is required'),
-  active: z.boolean().default(true),
+  provider: z.enum(['github']),
 });
 type WebhookForm = z.infer<typeof webhookSchema>;
 
@@ -92,7 +89,7 @@ export const ProjectDetails: React.FC = () => {
 
   const { register: registerWeb, handleSubmit: handleWebSubmit, reset: resetWeb, formState: { errors: webErrors } } = useForm<WebhookForm>({
     resolver: zodResolver(webhookSchema),
-    defaultValues: { name: '', url: '', secret: 'hook_secret_sign_123', active: true }
+    defaultValues: { provider: 'github' }
   });
 
   // Query Project details
@@ -179,7 +176,7 @@ export const ProjectDetails: React.FC = () => {
   // Webhook mutations
   const addWebhookMutation = useMutation({
     mutationFn: async (data: WebhookForm) => {
-      return apiClient.post(`/projects/${id}/webhooks`, { ...data, events: ['push', 'deployment.success', 'deployment.failed'] });
+      return apiClient.post(`/projects/${id}/webhooks`, { provider: data.provider });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project-webhooks', id] });
@@ -246,13 +243,13 @@ export const ProjectDetails: React.FC = () => {
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
             <h3 className="text-sm font-bold text-zinc-200 mb-4 border-b border-zinc-800/80 pb-2.5">Git Repository Config</h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
               <div className="p-3 bg-zinc-950 rounded-lg border border-zinc-850">
                 <span className="text-zinc-500 block text-[10px] uppercase font-bold">Remote Origin</span>
-                <a 
-                  href={project.repoUrl} 
-                  target="_blank" 
+                <a
+                  href={project.repoUrl}
+                  target="_blank"
                   rel="noreferrer"
                   className="text-zinc-300 hover:text-emerald-400 transition mt-1.5 inline-flex items-center gap-1 leading-normal"
                 >
@@ -296,12 +293,11 @@ export const ProjectDetails: React.FC = () => {
                   <div key={d.id} className="relative group">
                     {/* Node Dot */}
                     <span className="absolute -left-[21px] top-1.5 flex h-2.5 w-2.5 rounded-full bg-zinc-900 border border-zinc-800 items-center justify-center shrink-0">
-                      <span className={`h-1.5 w-1.5 rounded-full ${
-                        d.status === 'success' ? 'bg-emerald-500' : d.status === 'failed' ? 'bg-rose-500' : 'bg-blue-500'
-                      }`} />
+                      <span className={`h-1.5 w-1.5 rounded-full ${d.status === 'success' ? 'bg-emerald-500' : d.status === 'failed' ? 'bg-rose-500' : 'bg-blue-500'
+                        }`} />
                     </span>
 
-                    <div 
+                    <div
                       onClick={() => navigate(`/deployments/${d.id}`)}
                       className="p-3 bg-zinc-950/60 hover:bg-zinc-900 border border-zinc-850 hover:border-zinc-800 rounded-lg transition cursor-pointer"
                     >
@@ -362,7 +358,7 @@ export const ProjectDetails: React.FC = () => {
     return (
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 font-mono text-xs">
         <h3 className="text-sm font-bold text-zinc-200 mb-4 border-b border-zinc-800 pb-2.5 font-sans">Pipeline Execution History</h3>
-        
+
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-zinc-400 text-[11px]">
             <thead>
@@ -383,8 +379,8 @@ export const ProjectDetails: React.FC = () => {
                 </tr>
               ) : (
                 deployments.map((d) => (
-                  <tr 
-                    key={d.id} 
+                  <tr
+                    key={d.id}
                     className="hover:bg-zinc-850/20 transition cursor-pointer"
                     onClick={() => navigate(`/deployments/${d.id}`)}
                   >
@@ -426,9 +422,9 @@ export const ProjectDetails: React.FC = () => {
         <form onSubmit={handleEnvSubmit((data) => addEnvVarMutation.mutate(data))} className="p-4 bg-zinc-950 rounded-lg border border-zinc-850 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
           <div className="space-y-1 font-mono text-[10px]">
             <span className="font-bold text-zinc-500">VARIABLE KEY</span>
-            <input 
+            <input
               {...registerEnv('key')}
-              type="text" 
+              type="text"
               placeholder="DATABASE_URL"
               className="w-full h-8 px-2.5 rounded bg-zinc-900 border border-zinc-800 text-xs text-zinc-200 placeholder-zinc-700 focus:outline-none"
             />
@@ -437,9 +433,9 @@ export const ProjectDetails: React.FC = () => {
 
           <div className="space-y-1 font-mono text-[10px]">
             <span className="font-bold text-zinc-500">VARIABLE VALUE</span>
-            <input 
+            <input
               {...registerEnv('value')}
-              type="password" 
+              type="password"
               placeholder="••••••••••••"
               className="w-full h-8 px-2.5 rounded bg-zinc-900 border border-zinc-800 text-xs text-zinc-200 placeholder-zinc-750 focus:outline-none"
             />
@@ -449,9 +445,9 @@ export const ProjectDetails: React.FC = () => {
           {/* Secret configuration */}
           <div className="flex items-center gap-4 h-8">
             <label className="flex items-center gap-2 text-[10px] font-mono font-bold text-zinc-500 uppercase cursor-pointer select-none">
-              <input 
+              <input
                 {...registerEnv('isSecret')}
-                type="checkbox" 
+                type="checkbox"
                 className="rounded bg-zinc-900 border-zinc-800 text-emerald-500 focus:ring-0 focus:ring-offset-0"
               />
               <span>Encrypt Secret</span>
@@ -538,49 +534,23 @@ export const ProjectDetails: React.FC = () => {
         </div>
 
         {/* Add Webhook Form */}
-        <form onSubmit={handleWebSubmit((data) => addWebhookMutation.mutate(data))} className="p-4 bg-zinc-950 rounded-lg border border-zinc-850 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-1 font-mono text-[10px]">
-              <span className="font-bold text-zinc-500">INTEGRATION NAME</span>
-              <input 
-                {...registerWeb('name')}
-                type="text" 
-                placeholder="Slack Notifications"
-                className="w-full h-8 px-2.5 rounded bg-zinc-900 border border-zinc-800 text-xs text-zinc-200 placeholder-zinc-700 focus:outline-none"
-              />
-              {webErrors.name && <p className="text-[9px] text-rose-500 mt-0.5">{webErrors.name.message}</p>}
-            </div>
-
-            <div className="space-y-1 font-mono text-[10px] md:col-span-2">
-              <span className="font-bold text-zinc-500">PAYLOAD URL</span>
-              <input 
-                {...registerWeb('url')}
-                type="text" 
-                placeholder="https://api.slack.com/services/..."
-                className="w-full h-8 px-2.5 rounded bg-zinc-900 border border-zinc-800 text-xs text-zinc-200 placeholder-zinc-700 focus:outline-none"
-              />
-              {webErrors.url && <p className="text-[9px] text-rose-500 mt-0.5">{webErrors.url.message}</p>}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between border-t border-zinc-850 pt-3">
-            <div className="space-y-1 font-mono text-[10px]">
-              <span className="font-bold text-zinc-500 block">WEBHOOK SECRET</span>
-              <input 
-                {...registerWeb('secret')}
-                type="password" 
-                placeholder="hook_secret_value"
-                className="w-24 h-7 px-2 rounded bg-zinc-900 border border-zinc-800 text-xs text-zinc-200 placeholder-zinc-750 focus:outline-none"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="h-8 px-4 rounded bg-zinc-900 hover:bg-zinc-850 text-zinc-300 font-mono text-xs font-bold border border-zinc-800 hover:border-zinc-700 transition cursor-pointer"
+        <form onSubmit={handleWebSubmit((data) => addWebhookMutation.mutate(data))} className="p-4 bg-zinc-950 rounded-lg border border-zinc-850 flex items-end justify-between">
+          <div className="space-y-1 font-mono text-[10px]">
+            <span className="font-bold text-zinc-500 block">PROVIDER</span>
+            <select
+              {...registerWeb('provider')}
+              className="w-48 h-8 px-2 rounded bg-zinc-900 border border-zinc-800 text-xs text-zinc-200 focus:outline-none"
             >
-              Register Webhook
-            </button>
+              <option value="github">GitHub</option>
+            </select>
           </div>
+
+          <button
+            type="submit"
+            className="h-8 px-4 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-mono text-xs font-bold border border-emerald-500/20 transition cursor-pointer"
+          >
+            Generate Webhook Endpoint
+          </button>
         </form>
 
         {/* Webhooks listing */}
@@ -593,15 +563,14 @@ export const ProjectDetails: React.FC = () => {
                 <div className="flex items-center justify-between border-b border-zinc-850/50 pb-2">
                   <div className="flex items-center gap-2">
                     <Radio className="w-3.5 h-3.5 text-emerald-400 shrink-0 animate-pulse" />
-                    <span className="text-xs font-bold text-zinc-200 font-sans">{w.name}</span>
+                    <span className="text-xs font-bold text-zinc-200 font-sans uppercase">{w.provider} Integration</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className={`px-2 py-0.5 rounded text-[8px] font-mono border ${
-                      w.active 
+                    <span className={`px-2 py-0.5 rounded text-[8px] font-mono border ${w.isActive
                         ? 'bg-emerald-500/5 text-emerald-400 border-emerald-500/10'
                         : 'bg-zinc-900 text-zinc-550 border-zinc-850'
-                    }`}>
-                      {w.active ? 'active' : 'inactive'}
+                      }`}>
+                      {w.isActive ? 'listening' : 'inactive'}
                     </span>
                     <button
                       onClick={() => deleteWebhookMutation.mutate(w.id)}
@@ -612,31 +581,29 @@ export const ProjectDetails: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="text-[10px] font-mono text-zinc-500 flex justify-between">
-                  <span>URL: <span className="text-zinc-350">{w.url}</span></span>
-                  <span>Secret: <span className="text-zinc-350">••••••••••</span></span>
-                </div>
-
-                {/* Delivery Logs */}
-                <div className="space-y-1.5 pt-2">
-                  <span className="text-[9px] font-mono font-bold tracking-wider text-zinc-500 uppercase block">Delivery Logs</span>
-                  {w.deliveries.length === 0 ? (
-                    <span className="text-[10px] font-mono text-zinc-650 block">No delivery logs recorded for this endpoint</span>
-                  ) : (
-                    w.deliveries.map((d) => (
-                      <div key={d.id} className="flex items-center justify-between p-2 bg-zinc-950 border border-zinc-850 rounded text-[9px] font-mono">
-                        <div className="flex items-center gap-2">
-                          <span className={d.status === 'success' ? 'text-emerald-400' : 'text-rose-400'}>
-                            {d.statusCode} {d.statusCode === 200 ? 'OK' : 'FAIL'}
-                          </span>
-                          <span className="text-zinc-500">event: {d.event}</span>
-                        </div>
-                        <div className="text-zinc-500">
-                          {d.durationMs}ms // {new Date(d.createdAt).toLocaleTimeString()}
-                        </div>
-                      </div>
-                    ))
-                  )}
+                <div className="bg-zinc-950 p-3 rounded border border-zinc-850 space-y-3">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono font-bold text-zinc-500 uppercase">Payload URL</span>
+                    <div className="flex items-center gap-2">
+                      <code className="text-xs text-zinc-300 select-all bg-zinc-900 px-2 py-1 rounded w-full overflow-hidden text-ellipsis">
+                        http://&lt;your-domain&gt;/webhooks/{w.provider}
+                      </code>
+                      <button onClick={() => copyToClipboard(`http://localhost:8080/webhooks/${w.provider}`, 'Payload URL')} className="p-1.5 text-zinc-500 hover:text-zinc-300">
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono font-bold text-zinc-500 uppercase">Webhook Secret</span>
+                    <div className="flex items-center gap-2">
+                      <code className="text-xs text-zinc-300 select-all bg-zinc-900 px-2 py-1 rounded w-full overflow-hidden text-ellipsis">
+                        {w.secret}
+                      </code>
+                      <button onClick={() => copyToClipboard(w.secret, 'Webhook Secret')} className="p-1.5 text-zinc-500 hover:text-zinc-300">
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))
@@ -768,8 +735,8 @@ export const ProjectDetails: React.FC = () => {
               onClick={() => setActiveTab(tab)}
               className={`
                 px-4 py-2.5 font-bold transition border-b-2 -mb-px cursor-pointer
-                ${isActive 
-                  ? 'text-zinc-100 border-emerald-500 font-semibold' 
+                ${isActive
+                  ? 'text-zinc-100 border-emerald-500 font-semibold'
                   : 'text-zinc-500 border-transparent hover:text-zinc-300'
                 }
               `}
