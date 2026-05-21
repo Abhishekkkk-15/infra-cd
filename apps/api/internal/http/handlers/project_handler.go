@@ -19,6 +19,16 @@ func CreateProject(c *gin.Context) {
 	if project.Branch == "" {
 		project.Branch = "main"
 	}
+	
+	// Extract userID from context (set by auth middleware)
+	if userID, exists := c.Get("userID"); exists {
+		if idStr, ok := userID.(string); ok {
+			if parsedID, err := uuid.Parse(idStr); err == nil {
+				project.UserID = parsedID
+			}
+		}
+	}
+
 	if err := services.CreateProject(&project); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

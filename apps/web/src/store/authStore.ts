@@ -10,6 +10,8 @@ interface AuthState {
   logout: () => void;
 }
 
+import axios from 'axios';
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
@@ -17,25 +19,28 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       isAuthenticated: false,
       login: async (email, password) => {
-        // Simulate API network latency
-        await new Promise((resolve) => setTimeout(resolve, 800));
-
         if (!password || password.length < 6) {
           throw new Error('Password must be at least 6 characters');
         }
 
-        // Create a mock JWT token and user profile
-        const mockToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkRldmVsb3BlciIsImVtYWlsIjoiZGV2QGluZnJhLWNkLmRldiIsInJvbGUiOiJhZG1pbiJ9.mock_signature';
-        const user: User = {
-          id: 'dev-user-id',
-          email,
-          name: email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1),
-          role: 'Admin',
-          token: mockToken,
-        };
-
-        set({ user, token: mockToken, isAuthenticated: true });
-        return user;
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
+        
+        try {
+          const res = await axios.post(`${API_URL}/auth/login`, {
+            email,
+            password
+          });
+          
+          const { token, user } = res.data;
+          
+          set({ user, token, isAuthenticated: true });
+          return user;
+        } catch (err: any) {
+          if (err.response?.data?.error) {
+            throw new Error(err.response.data.error);
+          }
+          throw new Error('Authentication failed');
+        }
       },
       logout: () => {
         set({ user: null, token: null, isAuthenticated: false });

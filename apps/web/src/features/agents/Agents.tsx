@@ -332,6 +332,7 @@ export const Agents: React.FC = () => {
                   </div>
                 </>
               )}
+            </div>
           </div>
         </div>
       )}

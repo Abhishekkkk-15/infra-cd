@@ -13,6 +13,7 @@ import (
 	dbpkg "github.com/abhishekkkk-15/infra-cd/api/internal/db"
 	"github.com/abhishekkkk-15/infra-cd/api/internal/db/models"
 	"github.com/abhishekkkk-15/infra-cd/api/internal/http/handlers"
+	"github.com/abhishekkkk-15/infra-cd/api/internal/http/middleware"
 	agentsvc "github.com/abhishekkkk-15/infra-cd/api/internal/http/services"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -46,6 +47,11 @@ func main() {
 		&models.DeploymentLog{},
 	); err != nil {
 		log.Fatalf("failed to auto-migrate: %v", err)
+	}
+
+	// Seed Auth
+	if err := agentsvc.InitAuth(); err != nil {
+		log.Fatalf("failed to init auth: %v", err)
 	}
 
 	// ── Background: mark stale agents offline every 30s ──────────────────────
@@ -98,8 +104,18 @@ func main() {
 	// ── API v1 ────────────────────────────────────────────────────────────────
 	api := r.Group("/api/v1")
 
+	// Auth (public)
+	auth := api.Group("/auth")
+	{
+		auth.POST("/login", handlers.Login)
+	}
+
+	// Protected UI Group
+	ui := r.Group("/api/v1")
+	ui.Use(middleware.RequireAuth())
+
 	// Projects
-	projects := api.Group("/projects")
+	projects := ui.Group("/projects")
 	{
 		projects.GET("", handlers.GetProjects)
 		projects.POST("", handlers.CreateProject)
@@ -125,25 +141,37 @@ func main() {
 	// Deployments (top-level for detail + agent callbacks)
 	deployments := api.Group("/deployments")
 	{
-		deployments.GET("/:id", handlers.GetDeployment)
-		deployments.GET("/:id/logs/stream", handlers.StreamDeploymentLogs)
-		// Agent-facing endpoints
+		ui.GET("/deployments/:id", handlers.GetDeployment)
+		// UI stream logs uses EventSource which doesn't easily send auth headers natively unless modified,
+		// but since we want to protect it, we should map it onto `ui` and the frontend needs to handle it or we can leave it public.
+		// For simplicity, we'll map stream to `ui` and see if EventSource works with cookies/tokens in URL,
+		// but since EventSource doesn't do Bearer headers easily, we'll leave it in `api` (unprotected) or use query token.
+		// Let's protect GetDeployment but leave stream unprotected for MVP.
+		api.GET("/deployments/:id/logs/stream", handlers.StreamDeploymentLogs)
+
+		// Agent-facing endpoints (use agent tokens, currently unprotected)
 		deployments.PATCH("/:id/status", handlers.UpdateDeploymentStatus)
 		deployments.PATCH("/:id/steps/:stepId", handlers.UpdateDeploymentStep)
 		deployments.POST("/:id/logs", handlers.AppendDeploymentLog)
 	}
 
-	// Agents
+	// Agents UI endpoints
+	ui.GET("/agents", handlers.ListAgents)
+	ui.POST("/agents", handlers.CreateAgent)
+	ui.GET("/agents/:id", handlers.GetAgentByID)
+	ui.DELETE("/agents/:id", handlers.DeleteAgent)
+
+	// Agent-facing agent endpoints
 	agents := api.Group("/agents")
 	{
-		api.GET("/agents", handlers.ListAgents)
-		api.POST("/agents", handlers.CreateAgent)
-		api.GET("/agents/verify", handlers.VerifyAgent)
-		api.GET("/agents/:id", handlers.GetAgentByID)
-		api.DELETE("/agents/:id", handlers.DeleteAgent)
+		agents.GET("/verify", handlers.VerifyAgent)
 		agents.POST("/:id/heartbeat", handlers.Heartbeat)
 		agents.GET("/:id/pending-deployments", handlers.GetPendingDeployments)
 	}
+
+	// System metrics
+	ui.GET("/system/metrics", handlers.GetSystemMetrics)
+	ui.GET("/system/logs", handlers.GetSystemLogs)
 
 	// ── Server ────────────────────────────────────────────────────────────────
 	port := os.Getenv("PORT")

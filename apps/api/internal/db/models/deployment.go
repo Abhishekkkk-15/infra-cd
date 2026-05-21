@@ -18,7 +18,7 @@ const (
 func (s DeploymentStatus) String() string { return string(s) }
 
 type Deployment struct {
-	ID            uuid.UUID        `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	ID            uuid.UUID        `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	ProjectID     uuid.UUID        `json:"project_id"`
 	AgentID       *uuid.UUID       `json:"agent_id"`
 	Status        DeploymentStatus `json:"status"`
