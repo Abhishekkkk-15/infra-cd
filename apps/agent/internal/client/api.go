@@ -61,6 +61,7 @@ func (c *Client) VerifyAgent() (*Agent, error) {
 
 func (c *Client) SendHeartbeat(agentID string, cpuUsage, ramUsage float64) error {
 	resp, err := c.resty.R().
+		SetHeader("Content-Type", "application/json").
 		SetBody(map[string]float64{
 			"cpuUsage": cpuUsage,
 			"ramUsage": ramUsage,

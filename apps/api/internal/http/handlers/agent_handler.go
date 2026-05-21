@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/abhishekkkk-15/infra-cd/api/internal/http/services"
@@ -96,7 +97,9 @@ func Heartbeat(c *gin.Context) {
 		CpuUsage float64 `json:"cpuUsage"`
 		RamUsage float64 `json:"ramUsage"`
 	}
-	c.ShouldBindJSON(&req)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fmt.Printf("[API Heartbeat] Failed to bind JSON: %v\n", err)
+	}
 
 	if err := services.RecordHeartbeat(id, req.CpuUsage, req.RamUsage); err != nil {
 		if err.Error() == "agent not found" {

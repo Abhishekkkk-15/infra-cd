@@ -47,7 +47,7 @@ func main() {
 	go func() {
 		for {
 			var cpuUsage float64
-			if percentages, err := cpu.Percent(0, false); err == nil && len(percentages) > 0 {
+			if percentages, err := cpu.Percent(time.Second, false); err == nil && len(percentages) > 0 {
 				cpuUsage = percentages[0]
 			}
 			var ramUsage float64
