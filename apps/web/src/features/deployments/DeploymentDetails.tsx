@@ -148,7 +148,7 @@ export const DeploymentDetails: React.FC = () => {
       {/* Top Header bar with navigation back */}
       <div className="flex items-center gap-3">
         <Link 
-          to={`/projects/${deployment.projectId}`}
+          to={`/projects/${deployment.project_id}`}
           className="p-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-850 hover:text-zinc-200 transition cursor-pointer text-zinc-400"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -158,14 +158,14 @@ export const DeploymentDetails: React.FC = () => {
             <h1 className="text-lg font-bold text-zinc-100">Pipeline Deployment</h1>
             <span className="text-xs font-mono text-zinc-500">#{deployment.id.split('-')[1]}</span>
           </div>
-          <p className="text-[11px] text-zinc-500 font-mono mt-0.5">Project: {deployment.projectName}</p>
+          <p className="text-[11px] text-zinc-500 font-mono mt-0.5">Project: {(deployment as any).Project?.name || deployment.project_id}</p>
         </div>
 
         {/* Deployments Rollback actions */}
         {deployment.status === 'success' && (
           <button
             onClick={() => {
-              if (confirm(`Trigger rollback? This will compile a new deployment from commit ${deployment.commitHash}`)) {
+              if (confirm(`Trigger rollback? This will compile a new deployment from commit ${deployment.commit_sha}`)) {
                 rollbackMutation.mutate();
               }
             }}
@@ -190,19 +190,19 @@ export const DeploymentDetails: React.FC = () => {
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-zinc-400 font-mono text-xs">
             <GitCommit className="w-4 h-4 text-zinc-500 shrink-0" />
-            <span className="font-bold text-zinc-200">[{deployment.commitHash}]</span>
+            <span className="font-bold text-zinc-200">[{deployment.commit_sha || 'N/A'}]</span>
             <span>•</span>
             <span className="flex items-center gap-1">
-              <GitBranch className="w-3.5 h-3.5 text-zinc-500 shrink-0" /> {deployment.projectName}/main
+              <GitBranch className="w-3.5 h-3.5 text-zinc-500 shrink-0" /> {(deployment as any).Project?.name || 'repo'}/{(deployment as any).Project?.branch || 'main'}
             </span>
           </div>
           <h2 className="text-sm font-semibold text-zinc-100 font-sans tracking-tight pt-1">
-            {deployment.commitMessage}
+            {deployment.commit_message || 'Manual Deployment Trigger'}
           </h2>
           <div className="text-[10px] text-zinc-500 font-mono flex items-center gap-1.5 pt-1">
-            <span>Author: {deployment.commitAuthor}</span>
+            <span>Author: API/Web</span>
             <span>•</span>
-            <span>Triggered via {deployment.trigger}</span>
+            <span>Triggered via Web UI</span>
           </div>
         </div>
 
@@ -211,11 +211,15 @@ export const DeploymentDetails: React.FC = () => {
           <div className="font-mono text-xs text-zinc-400 space-y-1">
             <div className="flex justify-between md:justify-end gap-3 items-center">
               <span className="text-zinc-550 flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Duration</span>
-              <span className="font-bold text-zinc-200">{deployment.durationSeconds}s</span>
+              <span className="font-bold text-zinc-200">
+                {deployment.started_at && deployment.finished_at 
+                  ? Math.round((new Date(deployment.finished_at).getTime() - new Date(deployment.started_at).getTime()) / 1000) + 's' 
+                  : (deployment.status === 'running' ? 'running...' : '-')}
+              </span>
             </div>
             <div className="flex justify-between md:justify-end gap-3 items-center pt-1">
               <span className="text-zinc-550 flex items-center gap-1"><Server className="w-3.5 h-3.5" /> Agent</span>
-              <span className="text-zinc-300 font-semibold">{deployment.agentName}</span>
+              <span className="text-zinc-300 font-semibold">{(deployment as any).Agent?.name || 'Pool'}</span>
             </div>
           </div>
         </div>

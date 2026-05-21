@@ -326,14 +326,16 @@ export const ProjectDetails: React.FC = () => {
                         <StatusBadge status={d.status} />
                       </div>
                       <p className="text-[11px] text-zinc-400 mt-2 font-mono truncate">
-                        [{d.commitHash}] {d.commitMessage}
+                        [{d.commit_sha || 'N/A'}] {d.commit_message || 'Manual Trigger'}
                       </p>
                       <div className="flex items-center justify-between text-[9px] text-zinc-550 font-mono mt-3">
                         <span className="flex items-center gap-1 text-zinc-500">
-                          <User className="w-3 h-3" /> {d.commitAuthor}
+                          <User className="w-3 h-3" /> API/Web
                         </span>
                         <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" /> {d.durationSeconds}s // {new Date(d.createdAt).toLocaleTimeString()}
+                          <Clock className="w-3 h-3" /> {d.started_at && d.finished_at
+                            ? Math.round((new Date(d.finished_at).getTime() - new Date(d.started_at).getTime()) / 1000) + 's'
+                            : (d.status === 'running' ? 'running...' : '-')} // {new Date(d.created_at || new Date()).toLocaleTimeString()}
                         </span>
                       </div>
                     </div>
@@ -407,13 +409,17 @@ export const ProjectDetails: React.FC = () => {
                     <td className="py-3 font-semibold text-zinc-300 font-sans">#{d.id.split('-')[1]}</td>
                     <td className="py-3">
                       <div className="flex flex-col">
-                        <span className="text-zinc-200">[{d.commitHash}]</span>
-                        <span className="text-[10px] text-zinc-500 font-sans truncate max-w-[160px]">{d.commitMessage}</span>
+                        <span className="text-zinc-200">[{d.commit_sha || 'N/A'}]</span>
+                        <span className="text-[10px] text-zinc-500 font-sans truncate max-w-[160px]">{d.commit_message || 'Manual Trigger'}</span>
                       </div>
                     </td>
-                    <td className="py-3 text-zinc-500">{d.agentName}</td>
-                    <td className="py-3 text-zinc-300">{d.durationSeconds}s</td>
-                    <td className="py-3 text-zinc-500">{d.trigger}</td>
+                    <td className="py-3 text-zinc-500">{d.Agent?.name || 'Pool'}</td>
+                    <td className="py-3 text-zinc-300">
+                      {d.started_at && d.finished_at
+                        ? Math.round((new Date(d.finished_at).getTime() - new Date(d.started_at).getTime()) / 1000) + 's'
+                        : (d.status === 'running' ? 'running...' : '-')}
+                    </td>
+                    <td className="py-3 text-zinc-500">API/Web</td>
                     <td className="py-3">
                       <StatusBadge status={d.status} />
                     </td>
@@ -587,8 +593,8 @@ export const ProjectDetails: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className={`px-2 py-0.5 rounded text-[8px] font-mono border ${w.isActive
-                        ? 'bg-emerald-500/5 text-emerald-400 border-emerald-500/10'
-                        : 'bg-zinc-900 text-zinc-550 border-zinc-850'
+                      ? 'bg-emerald-500/5 text-emerald-400 border-emerald-500/10'
+                      : 'bg-zinc-900 text-zinc-550 border-zinc-850'
                       }`}>
                       {w.isActive ? 'listening' : 'inactive'}
                     </span>
@@ -689,7 +695,7 @@ export const ProjectDetails: React.FC = () => {
           <p className="text-zinc-500 leading-relaxed font-sans text-xs">
             Lock this project to a specific runner agent node. If pinned, only that specific server will ever execute pipelines for this project.
           </p>
-          <select 
+          <select
             value={project.agent_id || ''}
             onChange={(e) => updateAgentMutation.mutate(e.target.value || null)}
             className="w-full max-w-sm h-9 px-2 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 focus:outline-none"
@@ -739,7 +745,7 @@ export const ProjectDetails: React.FC = () => {
               <GitBranch className="w-3 h-3 text-zinc-500" /> {project.branch}
             </span>
             <span>•</span>
-            <span>Created {new Date(project.createdAt).toLocaleDateString()}</span>
+            <span>Created {new Date(project.created_at || new Date()).toLocaleDateString()}</span>
           </div>
         </div>
 
