@@ -107,6 +107,7 @@ func main() {
 	auth := api.Group("/auth")
 	{
 		auth.POST("/login", handlers.Login)
+		auth.POST("/register", handlers.Register)
 	}
 
 	// Protected UI Group

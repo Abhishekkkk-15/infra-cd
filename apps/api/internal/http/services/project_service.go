@@ -11,21 +11,21 @@ func CreateProject(project *models.Project) error {
 	return db.DB.Create(project).Error
 }
 
-func GetProjects() ([]models.Project, error) {
+func GetProjects(userID uuid.UUID) ([]models.Project, error) {
 	var projects []models.Project
-	err := db.DB.Find(&projects).Error
+	err := db.DB.Where("user_id = ?", userID).Find(&projects).Error
 	return projects, err
 }
 
-func GetProjectByID(id string) (models.Project, error) {
+func GetProjectByID(id string, userID uuid.UUID) (models.Project, error) {
 	var project models.Project
-	err := db.DB.First(&project, "id = ?", id).Error
+	err := db.DB.Where("id = ? AND user_id = ?", id, userID).First(&project).Error
 	return project, err
 }
 
-func UpdateProject(id uuid.UUID, updates map[string]interface{}) (models.Project, error) {
+func UpdateProject(id uuid.UUID, userID uuid.UUID, updates map[string]interface{}) (models.Project, error) {
 	var project models.Project
-	if err := db.DB.First(&project, "id = ?", id).Error; err != nil {
+	if err := db.DB.Where("id = ? AND user_id = ?", id, userID).First(&project).Error; err != nil {
 		return project, err
 	}
 	if err := db.DB.Model(&project).Updates(updates).Error; err != nil {
@@ -34,7 +34,12 @@ func UpdateProject(id uuid.UUID, updates map[string]interface{}) (models.Project
 	return project, nil
 }
 
-func DeleteProject(id uuid.UUID) error {
+func DeleteProject(id uuid.UUID, userID uuid.UUID) error {
+	var project models.Project
+	if err := db.DB.Where("id = ? AND user_id = ?", id, userID).First(&project).Error; err != nil {
+		return err
+	}
+
 	return db.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("project_id = ?", id).Delete(&models.EnvironmentVariable{}).Error; err != nil {
 			return err

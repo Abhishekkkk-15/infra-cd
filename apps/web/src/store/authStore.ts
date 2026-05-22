@@ -7,6 +7,7 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<User>;
+  register: (name: string, email: string, password: string) => Promise<User>;
   logout: () => void;
 }
 
@@ -40,6 +41,31 @@ export const useAuthStore = create<AuthState>()(
             throw new Error(err.response.data.error);
           }
           throw new Error('Authentication failed');
+        }
+      },
+      register: async (name, email, password) => {
+        if (!password || password.length < 6) {
+          throw new Error('Password must be at least 6 characters');
+        }
+
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
+        
+        try {
+          const res = await axios.post(`${API_URL}/auth/register`, {
+            name,
+            email,
+            password
+          });
+          
+          const { token, user } = res.data;
+          
+          set({ user, token, isAuthenticated: true });
+          return user;
+        } catch (err: any) {
+          if (err.response?.data?.error) {
+            throw new Error(err.response.data.error);
+          }
+          throw new Error('Registration failed');
         }
       },
       logout: () => {

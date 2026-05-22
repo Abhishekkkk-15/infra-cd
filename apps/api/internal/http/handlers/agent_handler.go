@@ -9,6 +9,18 @@ import (
 	"github.com/google/uuid"
 )
 
+func getAgentUserID(c *gin.Context) (uuid.UUID, error) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		return uuid.Nil, fmt.Errorf("user not authenticated")
+	}
+	idStr, ok := userID.(string)
+	if !ok {
+		return uuid.Nil, fmt.Errorf("invalid user id format")
+	}
+	return uuid.Parse(idStr)
+}
+
 // CreateAgent handles POST /agents
 func CreateAgent(c *gin.Context) {
 	var input struct {
@@ -18,7 +30,14 @@ func CreateAgent(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	agent, err := services.CreateAgent(input.Name)
+
+	userID, err := getAgentUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	agent, err := services.CreateAgent(input.Name, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -47,7 +66,13 @@ func VerifyAgent(c *gin.Context) {
 
 // ListAgents handles GET /agents
 func ListAgents(c *gin.Context) {
-	agents, err := services.ListAgents()
+	userID, err := getAgentUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	agents, err := services.ListAgents(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -57,12 +82,18 @@ func ListAgents(c *gin.Context) {
 
 // GetAgentByID handles GET /agents/:id
 func GetAgentByID(c *gin.Context) {
+	userID, err := getAgentUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid agent id"})
 		return
 	}
-	agent, err := services.GetAgentByID(id)
+	agent, err := services.GetAgentByID(id, userID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "agent not found"})
 		return
@@ -72,12 +103,18 @@ func GetAgentByID(c *gin.Context) {
 
 // DeleteAgent handles DELETE /agents/:id
 func DeleteAgent(c *gin.Context) {
+	userID, err := getAgentUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid agent id"})
 		return
 	}
-	if err := services.DeleteAgent(id); err != nil {
+	if err := services.DeleteAgent(id, userID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

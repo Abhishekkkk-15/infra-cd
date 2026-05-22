@@ -11,8 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// CreateAgent registers a new agent and generates a unique token.
-func CreateAgent(name string) (models.Agent, error) {
+func CreateAgent(name string, userID uuid.UUID) (models.Agent, error) {
 	token, err := generateToken()
 	if err != nil {
 		return models.Agent{}, fmt.Errorf("failed to generate token: %w", err)
@@ -21,18 +20,25 @@ func CreateAgent(name string) (models.Agent, error) {
 		Name:   name,
 		Token:  token,
 		Status: models.AgentOffline,
+		UserID: userID,
 	}
 	err = db.DB.Create(&agent).Error
 	return agent, err
 }
 
-func ListAgents() ([]models.Agent, error) {
+func ListAgents(userID uuid.UUID) ([]models.Agent, error) {
 	var agents []models.Agent
-	err := db.DB.Find(&agents).Error
+	err := db.DB.Where("user_id = ?", userID).Find(&agents).Error
 	return agents, err
 }
 
-func GetAgentByID(id uuid.UUID) (models.Agent, error) {
+func GetAgentByID(id uuid.UUID, userID uuid.UUID) (models.Agent, error) {
+	var agent models.Agent
+	err := db.DB.Where("id = ? AND user_id = ?", id, userID).First(&agent).Error
+	return agent, err
+}
+
+func GetAgentByIDSystem(id uuid.UUID) (models.Agent, error) {
 	var agent models.Agent
 	err := db.DB.First(&agent, "id = ?", id).Error
 	return agent, err
@@ -50,7 +56,12 @@ func GetAgentByToken(token string) (models.Agent, error) {
 	return agent, err
 }
 
-func DeleteAgent(id uuid.UUID) error {
+func DeleteAgent(id uuid.UUID, userID uuid.UUID) error {
+	var agent models.Agent
+	if err := db.DB.Where("id = ? AND user_id = ?", id, userID).First(&agent).Error; err != nil {
+		return err
+	}
+
 	if err := db.DB.Model(&models.Deployment{}).Where("agent_id = ?", id).Update("agent_id", nil).Error; err != nil {
 		return fmt.Errorf("failed to unlink agent deployments: %w", err)
 	}

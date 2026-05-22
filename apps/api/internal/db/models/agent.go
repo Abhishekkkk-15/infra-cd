@@ -23,6 +23,7 @@ type Agent struct {
 	LastHeartbeat *time.Time  `json:"last_heartbeat"`
 	CpuUsage      float64     `json:"cpuUsage"`
 	RamUsage      float64     `json:"ramUsage"`
+	UserID        uuid.UUID   `json:"user_id"`
 	BaseModel
 	Deployments []Deployment `gorm:"constraint:OnDelete:SET NULL;" json:"-"`
 }

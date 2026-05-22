@@ -68,3 +68,43 @@ func Login(email, password string) (string, *models.User, error) {
 
 	return tokenString, &user, nil
 }
+
+// Register creates a new user, hashes the password, and returns a JWT token.
+func Register(name, email, password string) (string, *models.User, error) {
+	var count int64
+	if err := db.DB.Model(&models.User{}).Where("email = ?", email).Count(&count).Error; err != nil {
+		return "", nil, errors.New("database error")
+	}
+	if count > 0 {
+		return "", nil, errors.New("email already in use")
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", nil, errors.New("failed to hash password")
+	}
+
+	user := models.User{
+		Name:     name,
+		Email:    email,
+		Password: string(hashedPassword),
+	}
+
+	if err := db.DB.Create(&user).Error; err != nil {
+		return "", nil, errors.New("failed to create user")
+	}
+
+	// Generate JWT Token
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub":   user.ID.String(),
+		"email": user.Email,
+		"exp":   time.Now().Add(time.Hour * 72).Unix(),
+	})
+
+	tokenString, err := token.SignedString(getJwtSecret())
+	if err != nil {
+		return "", nil, err
+	}
+
+	return tokenString, &user, nil
+}

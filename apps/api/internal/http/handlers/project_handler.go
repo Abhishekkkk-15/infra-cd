@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/abhishekkkk-15/infra-cd/api/internal/db/models"
@@ -8,6 +9,18 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
+func getUserID(c *gin.Context) (uuid.UUID, error) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		return uuid.Nil, fmt.Errorf("user not authenticated")
+	}
+	idStr, ok := userID.(string)
+	if !ok {
+		return uuid.Nil, fmt.Errorf("invalid user id format")
+	}
+	return uuid.Parse(idStr)
+}
 
 // CreateProject handles POST /projects
 func CreateProject(c *gin.Context) {
@@ -19,15 +32,13 @@ func CreateProject(c *gin.Context) {
 	if project.Branch == "" {
 		project.Branch = "main"
 	}
-	
-	// Extract userID from context (set by auth middleware)
-	if userID, exists := c.Get("userID"); exists {
-		if idStr, ok := userID.(string); ok {
-			if parsedID, err := uuid.Parse(idStr); err == nil {
-				project.UserID = parsedID
-			}
-		}
+
+	userID, err := getUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
 	}
+	project.UserID = userID
 
 	if err := services.CreateProject(&project); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -38,7 +49,13 @@ func CreateProject(c *gin.Context) {
 
 // GetProjects handles GET /projects
 func GetProjects(c *gin.Context) {
-	projects, err := services.GetProjects()
+	userID, err := getUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	projects, err := services.GetProjects(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -48,8 +65,14 @@ func GetProjects(c *gin.Context) {
 
 // GetProjectByID handles GET /projects/:id
 func GetProjectByID(c *gin.Context) {
+	userID, err := getUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
 	id := c.Param("id")
-	project, err := services.GetProjectByID(id)
+	project, err := services.GetProjectByID(id, userID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "project not found"})
 		return
@@ -59,6 +82,12 @@ func GetProjectByID(c *gin.Context) {
 
 // UpdateProject handles PUT /projects/:id
 func UpdateProject(c *gin.Context) {
+	userID, err := getUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project id"})
@@ -73,7 +102,7 @@ func UpdateProject(c *gin.Context) {
 	// Ensure ID is not updated
 	delete(updates, "id")
 
-	project, err := services.UpdateProject(id, updates)
+	project, err := services.UpdateProject(id, userID, updates)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -83,12 +112,18 @@ func UpdateProject(c *gin.Context) {
 
 // DeleteProject handles DELETE /projects/:id
 func DeleteProject(c *gin.Context) {
+	userID, err := getUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project id"})
 		return
 	}
-	if err := services.DeleteProject(id); err != nil {
+	if err := services.DeleteProject(id, userID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

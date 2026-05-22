@@ -3,24 +3,32 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { motion } from 'framer-motion';
-import { Terminal, ShieldCheck, Mail, Lock, Server, Cpu, Database } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Terminal, ShieldCheck, Mail, Lock, Server, Cpu, Database, User } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useNotification } from '../../hooks/useNotification';
 
-// Zod login schema
+// Zod schemas
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
+const signupSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  email: z.string().email('Please enter a valid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+});
+
 type LoginFields = z.infer<typeof loginSchema>;
+type SignupFields = z.infer<typeof signupSchema>;
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { login, isAuthenticated } = useAuthStore();
+  const { login, register: registerUser, isAuthenticated } = useAuthStore();
   const notification = useNotification();
   const [isLoading, setIsLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -32,24 +40,36 @@ export const Login: React.FC = () => {
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors },
-  } = useForm<LoginFields>({
-    resolver: zodResolver(loginSchema),
+  } = useForm<SignupFields>({
+    resolver: zodResolver(isSignUp ? signupSchema : loginSchema),
     defaultValues: {
+      name: '',
       email: 'admin@infra-cd.dev',
       password: 'admin-password',
     }
   });
 
-  const onSubmit = async (data: LoginFields) => {
+  const toggleMode = () => {
+    setIsSignUp(!isSignUp);
+    reset({ name: '', email: '', password: '' });
+  };
+
+  const onSubmit = async (data: SignupFields) => {
     setIsLoading(true);
     try {
-      await login(data.email, data.password);
-      notification.success('Authentication successful', `Welcome to the console.`);
+      if (isSignUp) {
+        await registerUser(data.name, data.email, data.password);
+        notification.success('Account created', `Welcome, ${data.name}!`);
+      } else {
+        await login(data.email, data.password);
+        notification.success('Authentication successful', `Welcome to the console.`);
+      }
       navigate('/', { replace: true });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Check your credentials.';
-      notification.error('Authentication failed', message);
+      notification.error(isSignUp ? 'Registration failed' : 'Authentication failed', message);
     } finally {
       setIsLoading(false);
     }
@@ -126,31 +146,58 @@ export const Login: React.FC = () => {
       </div>
 
       {/* RIGHT SIDE: Authentication Card */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-zinc-950 relative">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-zinc-950 relative overflow-y-auto">
         <div className="absolute top-1/2 left-1/4 -translate-y-1/2 w-80 h-80 bg-emerald-500/5 rounded-full filter blur-3xl shrink-0"></div>
 
         <motion.div
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full max-w-sm bg-zinc-900/40 border border-zinc-800/80 backdrop-blur-xl p-8 rounded-2xl shadow-2xl flex flex-col relative z-10"
+          className="w-full max-w-sm bg-zinc-900/40 border border-zinc-800/80 backdrop-blur-xl p-8 rounded-2xl shadow-2xl flex flex-col relative z-10 my-auto"
         >
-          {/* Lock header */}
+          {/* Header */}
           <div className="flex flex-col items-center text-center">
             <div className="w-11 h-11 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-emerald-400 shadow-inner">
               <ShieldCheck className="w-5 h-5 text-emerald-400" />
             </div>
             <h2 className="text-xl font-bold tracking-tight text-zinc-100 mt-4">
-              Access Console
+              {isSignUp ? 'Create Account' : 'Access Console'}
             </h2>
             <p className="text-xs text-zinc-500 mt-1">
-              Enter your administration details below
+              {isSignUp ? 'Join the platform to start building.' : 'Enter your administration details below'}
             </p>
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-4">
-            
+            <AnimatePresence initial={false}>
+              {isSignUp && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="space-y-1.5 overflow-hidden"
+                >
+                  <label className="text-[11px] font-mono font-bold tracking-wider text-zinc-500 uppercase">
+                    Full Name
+                  </label>
+                  <div className="relative flex items-center">
+                    <User className="w-4 h-4 text-zinc-600 absolute left-3 pointer-events-none" />
+                    <input
+                      {...register('name')}
+                      type="text"
+                      placeholder="Jane Doe"
+                      className="w-full h-10 pl-9 pr-4 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-700 focus:ring-1 focus:ring-zinc-800 transition"
+                      disabled={isLoading}
+                    />
+                  </div>
+                  {errors.name && (
+                    <p className="text-[10px] text-rose-500 font-mono mt-1">{errors.name.message}</p>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Email Field */}
             <div className="space-y-1.5">
               <label className="text-[11px] font-mono font-bold tracking-wider text-zinc-500 uppercase">
@@ -177,9 +224,11 @@ export const Login: React.FC = () => {
                 <label className="text-[11px] font-mono font-bold tracking-wider text-zinc-500 uppercase">
                   Password
                 </label>
-                <a href="#reset" className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 transition">
-                  Forgot?
-                </a>
+                {!isSignUp && (
+                  <a href="#reset" className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 transition">
+                    Forgot?
+                  </a>
+                )}
               </div>
               <div className="relative flex items-center">
                 <Lock className="w-4 h-4 text-zinc-600 absolute left-3 pointer-events-none" />
@@ -211,18 +260,24 @@ export const Login: React.FC = () => {
               {isLoading ? (
                 <div className="flex items-center justify-center gap-2">
                   <div className="w-3.5 h-3.5 border-2 border-zinc-500 border-t-zinc-300 rounded-full animate-spin"></div>
-                  <span>Authenticating...</span>
+                  <span>{isSignUp ? 'Registering...' : 'Authenticating...'}</span>
                 </div>
               ) : (
-                'VALIDATE SECURE SIGN-IN'
+                isSignUp ? 'CREATE ACCOUNT' : 'VALIDATE SECURE SIGN-IN'
               )}
             </button>
           </form>
 
-          {/* Setup Tip */}
-          <div className="mt-8 text-center text-[10px] font-mono text-zinc-600 leading-normal border-t border-zinc-900 pt-6">
-            Stand-alone dashboard client mode enabled.<br />
-            Configured default account credentials loaded.
+          {/* Toggle mode */}
+          <div className="mt-6 text-center text-[11px] text-zinc-400 font-sans">
+            {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
+            <button
+              type="button"
+              onClick={toggleMode}
+              className="text-emerald-400 hover:text-emerald-300 hover:underline transition font-bold"
+            >
+              {isSignUp ? "Sign In" : "Sign Up"}
+            </button>
           </div>
 
         </motion.div>
