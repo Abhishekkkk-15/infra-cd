@@ -27,6 +27,7 @@ const projectSchema = z.object({
   is_dockerized: z.boolean().default(true),
   dockerfile_path: z.string().default('Dockerfile'),
   description: z.string().default(''),
+  build_path: z.string().default(''),
 });
 
 type ProjectFormFields = z.infer<typeof projectSchema>;
@@ -55,6 +56,7 @@ export const Projects: React.FC = () => {
       is_dockerized: true,
       dockerfile_path: 'Dockerfile',
       description: '',
+      build_path: '',
     }
   });
 
@@ -360,6 +362,22 @@ export const Projects: React.FC = () => {
                     placeholder="./deploy.sh  or  docker-compose up -d"
                     className="w-full h-9 px-3 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-200 placeholder-zinc-650 focus:outline-none focus:border-zinc-700 transition"
                   />
+                </div>
+
+                {/* Build Path */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono font-bold tracking-wider text-zinc-500 uppercase">
+                    Build Path (Monorepo Directory Filter)
+                  </label>
+                  <input
+                    {...register('build_path')}
+                    type="text"
+                    placeholder="e.g. frontend  (leave empty for repo root)"
+                    className="w-full h-9 px-3 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-200 placeholder-zinc-650 focus:outline-none focus:border-zinc-700 transition"
+                  />
+                  <p className="text-[9px] text-zinc-500 font-mono mt-0.5">
+                    Trigger builds only if files in this path change (e.g. "frontend").
+                  </p>
                 </div>
 
                 {/* Form Buttons */}

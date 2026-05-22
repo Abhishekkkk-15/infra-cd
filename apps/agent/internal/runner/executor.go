@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -114,8 +115,24 @@ func RunDeployment(c *client.Client, d client.Deployment) error {
 			ctx.logInfo("No jobs defined in pipeline config.")
 		}
 
+		// Retrieve list of changed files for path filtering
+		changedFiles, err := getChangedFiles(workDir, d.CommitSHA)
+		if err != nil {
+			ctx.logInfo(fmt.Sprintf("Warning: failed to determine changed files: %v. Running all jobs.", err))
+		} else if len(changedFiles) > 0 {
+			ctx.logInfo(fmt.Sprintf("Detected %d changed file(s) in this commit.", len(changedFiles)))
+		}
+
 		for idx, job := range config.Jobs {
 			stepOrder := 4 + idx
+			if !shouldRunJob(job, changedFiles) {
+				ctx.logInfo(fmt.Sprintf("--- Skipping Job: %s (no matching paths changed) ---", job.Name))
+				_ = executeStep(ctx, job.Name, job.Script, stepOrder, func() error {
+					ctx.logInfo(fmt.Sprintf("Job '%s' skipped because no changed files matched path filters: %v", job.Name, job.Paths))
+					return nil
+				})
+				continue
+			}
 			ctx.logInfo(fmt.Sprintf("--- Running Job: %s ---", job.Name))
 			err = executeStep(ctx, job.Name, job.Script, stepOrder, func() error {
 				return ctx.runScript(workDir, job.Script, envList)
@@ -237,4 +254,80 @@ func (ctx *ExecutionContext) logError(msg string) {
 	fmt.Println("[ERROR]", msg)
 	go ctx.Client.AppendLog(ctx.DeployID, msg, "stderr")
 	time.Sleep(100 * time.Millisecond) // buffer ordering
+}
+
+func getChangedFiles(workDir, commitSHA string) ([]string, error) {
+	if commitSHA == "" || commitSHA == "HEAD" {
+		cmd := exec.Command("git", "rev-parse", "HEAD")
+		cmd.Dir = workDir
+		out, err := cmd.Output()
+		if err != nil {
+			return nil, err
+		}
+		commitSHA = strings.TrimSpace(string(out))
+	}
+
+	cmd := exec.Command("git", "diff-tree", "--no-commit-id", "--name-only", "--root", "-r", "-m", commitSHA)
+	cmd.Dir = workDir
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get diff: %w", err)
+	}
+
+	var files []string
+	lines := strings.Split(string(out), "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" {
+			files = append(files, trimmed)
+		}
+	}
+	return files, nil
+}
+
+func shouldRunJob(job Job, changedFiles []string) bool {
+	if len(job.Paths) == 0 {
+		return true
+	}
+	if len(changedFiles) == 0 {
+		return true
+	}
+	for _, pattern := range job.Paths {
+		for _, file := range changedFiles {
+			if matchPathPattern(pattern, file) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func matchPathPattern(pattern, path string) bool {
+	pattern = filepath.ToSlash(filepath.Clean(pattern))
+	path = filepath.ToSlash(filepath.Clean(path))
+
+	if strings.Contains(pattern, "**") {
+		parts := strings.Split(pattern, "**")
+		prefix := parts[0]
+		// If the prefix has a trailing slash, we might have cleaned it, but let's be careful.
+		// e.g. "frontend/**" prefix is "frontend/".
+		if strings.HasPrefix(path, prefix) {
+			if len(parts) > 1 && parts[1] != "" {
+				return strings.HasSuffix(path, parts[1])
+			}
+			return true
+		}
+		return false
+	}
+
+	matched, err := filepath.Match(pattern, path)
+	if err == nil && matched {
+		return true
+	}
+
+	if pattern == path || strings.HasPrefix(path, pattern+"/") {
+		return true
+	}
+
+	return false
 }

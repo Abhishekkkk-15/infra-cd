@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -82,6 +82,13 @@ export const ProjectDetails: React.FC = () => {
   const [revealedSecrets, setRevealedSecrets] = useState<Record<string, boolean>>({});
   const [yamlConfig, setYamlConfig] = useState(defaultYamlConfig);
   const [showDeployToken, setShowDeployToken] = useState(false);
+  const [buildPath, setBuildPath] = useState('');
+
+  useEffect(() => {
+    if (projectBase) {
+      setBuildPath(projectBase.build_path || '');
+    }
+  }, [projectBase]);
 
   // Zod form binding
   const { register: registerEnv, handleSubmit: handleEnvSubmit, reset: resetEnv, formState: { errors: envErrors } } = useForm<EnvVarForm>({
@@ -151,6 +158,19 @@ export const ProjectDetails: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project', id] });
       notification.success('Affinity Updated', 'Runner assignment saved.');
+    }
+  });
+
+  const updateBuildPathMutation = useMutation({
+    mutationFn: async (path: string) => {
+      return apiClient.put(`/projects/${id}`, { build_path: path });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      notification.success('Build Path Saved', 'Project directory filter updated.');
+    },
+    onError: (err: any) => {
+      notification.error('Error saving build path', err.message || 'Update failed');
     }
   });
 
@@ -721,6 +741,32 @@ export const ProjectDetails: React.FC = () => {
               <option key={a.id} value={a.id}>{a.name} ({a.status})</option>
             ))}
           </select>
+        </div>
+
+        {/* Build Path (Monorepo filter) Section */}
+        <div className="p-4 bg-zinc-950 border border-zinc-850 rounded-xl space-y-3">
+          <h4 className="text-sm font-bold text-zinc-300 flex items-center gap-1.5 font-sans">
+            <Radio className="w-4 h-4 text-emerald-400" /> Build Path (Monorepo Directory Filter)
+          </h4>
+          <p className="text-zinc-500 leading-relaxed font-sans text-xs">
+            Specify the subdirectory to monitor for this project (e.g., <code className="text-zinc-400 bg-zinc-900 px-1 py-0.5 rounded border border-zinc-850 font-mono">frontend</code>). Git push webhooks will only trigger a build if files in this path are changed.
+          </p>
+          <div className="flex gap-3">
+            <input
+              type="text"
+              value={buildPath}
+              onChange={(e) => setBuildPath(e.target.value)}
+              placeholder="e.g. frontend  (leave empty for repo root)"
+              className="flex-1 max-w-sm h-9 px-3 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 focus:outline-none"
+            />
+            <button
+              onClick={() => updateBuildPathMutation.mutate(buildPath)}
+              disabled={updateBuildPathMutation.isPending}
+              className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-mono text-xs font-bold transition cursor-pointer shrink-0"
+            >
+              {updateBuildPathMutation.isPending ? 'Saving...' : 'SAVE PATH'}
+            </button>
+          </div>
         </div>
 
         {/* Project Deploy Token Section */}

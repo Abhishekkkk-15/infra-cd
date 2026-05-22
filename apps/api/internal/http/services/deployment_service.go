@@ -16,6 +16,11 @@ import (
 
 // TriggerDeployment creates a new deployment record and launches the runner asynchronously.
 func TriggerDeployment(projectID uuid.UUID) (models.Deployment, error) {
+	return TriggerDeploymentWithCommit(projectID, "", "")
+}
+
+// TriggerDeploymentWithCommit creates a new deployment record with commit info and launches the runner.
+func TriggerDeploymentWithCommit(projectID uuid.UUID, commitSHA, commitMsg string) (models.Deployment, error) {
 	// Verify project exists
 	var project models.Project
 	if err := db.DB.First(&project, "id = ?", projectID).Error; err != nil {
@@ -23,9 +28,11 @@ func TriggerDeployment(projectID uuid.UUID) (models.Deployment, error) {
 	}
 
 	d := models.Deployment{
-		ProjectID: projectID,
-		Status:    models.DeploymentPending,
-		Branch:    project.Branch,
+		ProjectID:     projectID,
+		Status:        models.DeploymentPending,
+		Branch:        project.Branch,
+		CommitSHA:     commitSHA,
+		CommitMessage: commitMsg,
 	}
 
 	if project.AgentID != nil {
