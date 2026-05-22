@@ -84,11 +84,6 @@ export const ProjectDetails: React.FC = () => {
   const [showDeployToken, setShowDeployToken] = useState(false);
   const [buildPath, setBuildPath] = useState('');
 
-  useEffect(() => {
-    if (projectBase) {
-      setBuildPath(projectBase.build_path || '');
-    }
-  }, [projectBase]);
 
   // Zod form binding
   const { register: registerEnv, handleSubmit: handleEnvSubmit, reset: resetEnv, formState: { errors: envErrors } } = useForm<EnvVarForm>({
@@ -111,6 +106,11 @@ export const ProjectDetails: React.FC = () => {
     enabled: !!id,
   });
 
+  useEffect(() => {
+    if (projectBase) {
+      setBuildPath(projectBase.build_path || '');
+    }
+  }, [projectBase]);
   const { data: envVars = [] } = useQuery({
     queryKey: ['project-env', id],
     queryFn: async () => {
