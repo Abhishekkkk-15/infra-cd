@@ -83,6 +83,18 @@ func UpdateDeploymentStatus(id uuid.UUID, status string) error {
 	return db.DB.Model(&models.Deployment{}).Where("id = ?", id).Updates(updates).Error
 }
 
+func CreateDeploymentStep(deploymentID uuid.UUID, name, command, status string, order int) (models.DeploymentStep, error) {
+	step := models.DeploymentStep{
+		DeploymentID: deploymentID,
+		Name:         name,
+		Command:      command,
+		Status:       models.StepStatus(status),
+		Order:        order,
+	}
+	err := db.DB.Create(&step).Error
+	return step, err
+}
+
 func UpdateDeploymentStep(stepID uuid.UUID, status, output string) error {
 	return db.DB.Model(&models.DeploymentStep{}).
 		Where("id = ?", stepID).

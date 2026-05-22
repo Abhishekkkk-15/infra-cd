@@ -84,6 +84,31 @@ func UpdateDeploymentStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "updated"})
 }
 
+// CreateDeploymentStep handles POST /deployments/:id/steps (called by agent)
+func CreateDeploymentStep(c *gin.Context) {
+	deploymentID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid deployment id"})
+		return
+	}
+	var body struct {
+		Name    string `json:"name" binding:"required"`
+		Command string `json:"command"`
+		Status  string `json:"status" binding:"required"`
+		Order   int    `json:"order"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	step, err := services.CreateDeploymentStep(deploymentID, body.Name, body.Command, body.Status, body.Order)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, step)
+}
+
 // UpdateDeploymentStep handles PATCH /deployments/:id/steps/:stepId (called by agent)
 func UpdateDeploymentStep(c *gin.Context) {
 	stepID, err := uuid.Parse(c.Param("stepId"))

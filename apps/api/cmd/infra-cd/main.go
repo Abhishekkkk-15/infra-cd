@@ -151,6 +151,7 @@ func main() {
 
 		// Agent-facing endpoints (use agent tokens, currently unprotected)
 		deployments.PATCH("/:id/status", handlers.UpdateDeploymentStatus)
+		deployments.POST("/:id/steps", handlers.CreateDeploymentStep)
 		deployments.PATCH("/:id/steps/:stepId", handlers.UpdateDeploymentStep)
 		deployments.POST("/:id/logs", handlers.AppendDeploymentLog)
 	}

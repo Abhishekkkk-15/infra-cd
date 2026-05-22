@@ -18,6 +18,29 @@ type ExecutionContext struct {
 	DeployID string
 }
 
+func executeStep(ctx *ExecutionContext, name, command string, order int, execFunc func() error) error {
+	step, err := ctx.Client.CreateDeploymentStep(ctx.DeployID, name, command, "running", order)
+	if err != nil {
+		ctx.logError(fmt.Sprintf("Failed to create step '%s': %v", name, err))
+	}
+
+	err = execFunc()
+
+	if step != nil {
+		status := "success"
+		output := "Completed successfully"
+		if err != nil {
+			status = "failed"
+			output = err.Error()
+		}
+		if updateErr := ctx.Client.UpdateDeploymentStep(ctx.DeployID, step.ID, status, output); updateErr != nil {
+			ctx.logError(fmt.Sprintf("Failed to update step '%s': %v", name, updateErr))
+		}
+	}
+
+	return err
+}
+
 func RunDeployment(c *client.Client, d client.Deployment) error {
 	ctx := &ExecutionContext{
 		Client:   c,
@@ -45,27 +68,38 @@ func RunDeployment(c *client.Client, d client.Deployment) error {
 
 	// 2. Clone Repository
 	ctx.logInfo(fmt.Sprintf("Cloning repository %s (branch: %s)", d.Project.RepoURL, d.Branch))
-	cloneCmd := exec.Command("git", "clone", "--branch", d.Branch, d.Project.RepoURL, ".")
-	cloneCmd.Dir = workDir
-	if err := ctx.streamCommand(cloneCmd, envList); err != nil {
-		return fmt.Errorf("git clone failed: %v", err)
+	cloneCmdStr := fmt.Sprintf("git clone --branch %s %s .", d.Branch, d.Project.RepoURL)
+	err = executeStep(ctx, "Git Clone", cloneCmdStr, 1, func() error {
+		cloneCmd := exec.Command("git", "clone", "--branch", d.Branch, d.Project.RepoURL, ".")
+		cloneCmd.Dir = workDir
+		return ctx.streamCommand(cloneCmd, envList)
+	})
+	if err != nil {
+		return err
 	}
 
 	// 3. Checkout specific commit if provided
 	if d.CommitSHA != "" && d.CommitSHA != "HEAD" {
 		ctx.logInfo(fmt.Sprintf("Checking out commit %s", d.CommitSHA))
-		checkoutCmd := exec.Command("git", "checkout", d.CommitSHA)
-		checkoutCmd.Dir = workDir
-		if err := ctx.streamCommand(checkoutCmd, envList); err != nil {
-			return fmt.Errorf("git checkout failed: %v", err)
+		checkoutCmdStr := fmt.Sprintf("git checkout %s", d.CommitSHA)
+		err = executeStep(ctx, "Git Checkout", checkoutCmdStr, 2, func() error {
+			checkoutCmd := exec.Command("git", "checkout", d.CommitSHA)
+			checkoutCmd.Dir = workDir
+			return ctx.streamCommand(checkoutCmd, envList)
+		})
+		if err != nil {
+			return err
 		}
 	}
 
 	// 4. Restore Cache
 	ctx.logInfo("Restoring cached dependencies (if any)...")
-	if err := extractCache(d.ProjectID, workDir); err != nil {
-		ctx.logError(fmt.Sprintf("Cache restoration warning: %v", err))
-	}
+	_ = executeStep(ctx, "Restore Cache", "Extracting cached folders", 3, func() error {
+		if err := extractCache(d.ProjectID, workDir); err != nil {
+			return err
+		}
+		return nil
+	})
 
 	// 5. Execute pipeline or fallback deploy script
 	configPath := filepath.Join(workDir, ".infra-cd.yaml")
@@ -80,18 +114,22 @@ func RunDeployment(c *client.Client, d client.Deployment) error {
 			ctx.logInfo("No jobs defined in pipeline config.")
 		}
 
-		for _, job := range config.Jobs {
+		for idx, job := range config.Jobs {
+			stepOrder := 4 + idx
 			ctx.logInfo(fmt.Sprintf("--- Running Job: %s ---", job.Name))
-			if err := ctx.runScript(workDir, job.Script, envList); err != nil {
+			err = executeStep(ctx, job.Name, job.Script, stepOrder, func() error {
+				return ctx.runScript(workDir, job.Script, envList)
+			})
+			if err != nil {
 				return fmt.Errorf("job '%s' failed: %v", job.Name, err)
 			}
 		}
 
 		if len(config.Cache) > 0 {
 			ctx.logInfo("Saving cache for specified directories...")
-			if err := saveCache(d.ProjectID, workDir, config.Cache); err != nil {
-				ctx.logError(fmt.Sprintf("Failed to save cache: %v", err))
-			}
+			_ = executeStep(ctx, "Save Cache", "Archiving cache folders", 4+len(config.Jobs), func() error {
+				return saveCache(d.ProjectID, workDir, config.Cache)
+			})
 		}
 	} else {
 		// Fallback to legacy deploy script logic
@@ -101,7 +139,10 @@ func RunDeployment(c *client.Client, d client.Deployment) error {
 			if script == "" {
 				script = "docker-compose up -d --build"
 			}
-			if err := ctx.runScript(workDir, script, envList); err != nil {
+			err = executeStep(ctx, "Docker Deploy", script, 4, func() error {
+				return ctx.runScript(workDir, script, envList)
+			})
+			if err != nil {
 				return fmt.Errorf("docker deploy failed: %v", err)
 			}
 		} else {
@@ -110,7 +151,10 @@ func RunDeployment(c *client.Client, d client.Deployment) error {
 			if script == "" {
 				script = "./deploy.sh"
 			}
-			if err := ctx.runScript(workDir, script, envList); err != nil {
+			err = executeStep(ctx, "Shell Deploy", script, 4, func() error {
+				return ctx.runScript(workDir, script, envList)
+			})
+			if err != nil {
 				return fmt.Errorf("shell deploy failed: %v", err)
 			}
 		}

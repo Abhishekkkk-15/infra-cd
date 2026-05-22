@@ -101,11 +101,49 @@ func (c *Client) UpdateDeploymentStatus(deployID, status string) error {
 	return nil
 }
 
-func (c *Client) UpdateDeploymentStep(deployID, stepName, status, output string) error {
-	// The API uses stepId in the URL. For simplicity, we can modify the API or pass the step name in body.
-	// Actually, the API `PATCH /deployments/:id/steps/:stepId` uses Step ID.
-	// We might need to adjust the API or the agent to match.
-	// Since agent creates steps on the fly, it's better if agent just appends logs.
+type DeploymentStep struct {
+	ID           string `json:"id"`
+	DeploymentID string `json:"deployment_id"`
+	Name         string `json:"name"`
+	Command      string `json:"command"`
+	Order        int    `json:"order"`
+	Status       string `json:"status"`
+	Output       string `json:"output"`
+}
+
+func (c *Client) CreateDeploymentStep(deployID, name, command, status string, order int) (*DeploymentStep, error) {
+	var step DeploymentStep
+	resp, err := c.resty.R().
+		SetBody(map[string]interface{}{
+			"name":    name,
+			"command": command,
+			"status":  status,
+			"order":   order,
+		}).
+		SetResult(&step).
+		Post(fmt.Sprintf("/deployments/%s/steps", deployID))
+	if err != nil {
+		return nil, err
+	}
+	if resp.IsError() {
+		return nil, fmt.Errorf("create step failed: %s", resp.String())
+	}
+	return &step, nil
+}
+
+func (c *Client) UpdateDeploymentStep(deployID, stepID, status, output string) error {
+	resp, err := c.resty.R().
+		SetBody(map[string]string{
+			"status": status,
+			"output": output,
+		}).
+		Patch(fmt.Sprintf("/deployments/%s/steps/%s", deployID, stepID))
+	if err != nil {
+		return err
+	}
+	if resp.IsError() {
+		return fmt.Errorf("update step failed: %s", resp.String())
+	}
 	return nil
 }
 
