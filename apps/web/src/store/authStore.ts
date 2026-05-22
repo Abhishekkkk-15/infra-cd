@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User } from '../types';
+import { apiClient } from '@/api';
 
 interface AuthState {
   user: User | null;
@@ -11,7 +12,6 @@ interface AuthState {
   logout: () => void;
 }
 
-import axios from 'axios';
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -24,10 +24,9 @@ export const useAuthStore = create<AuthState>()(
           throw new Error('Password must be at least 6 characters');
         }
 
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
         
         try {
-          const res = await axios.post(`${API_URL}/auth/login`, {
+          const res = await apiClient.post(`/auth/login`, {
             email,
             password
           });
@@ -48,10 +47,9 @@ export const useAuthStore = create<AuthState>()(
           throw new Error('Password must be at least 6 characters');
         }
 
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
         
         try {
-          const res = await axios.post(`${API_URL}/auth/register`, {
+          const res = await apiClient.post(`/auth/register`, {
             name,
             email,
             password
