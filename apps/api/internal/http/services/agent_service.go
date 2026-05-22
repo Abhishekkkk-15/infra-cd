@@ -51,6 +51,9 @@ func GetAgentByToken(token string) (models.Agent, error) {
 }
 
 func DeleteAgent(id uuid.UUID) error {
+	if err := db.DB.Model(&models.Deployment{}).Where("agent_id = ?", id).Update("agent_id", nil).Error; err != nil {
+		return fmt.Errorf("failed to unlink agent deployments: %w", err)
+	}
 	return db.DB.Delete(&models.Agent{}, "id = ?", id).Error
 }
 
