@@ -97,10 +97,18 @@ func GetSystemLogs() ([]ActivityLog, error) {
 			severity = "warning"
 		}
 
+		sha := d.CommitSHA
+		if len(sha) > 7 {
+			sha = sha[:7]
+		}
+		if sha == "" {
+			sha = "HEAD"
+		}
+
 		logs = append(logs, ActivityLog{
 			ID:        d.ID.String(),
 			Type:      "deployment",
-			Message:   "Deployment " + d.Project.Name + " (" + d.CommitSHA[:7] + ") - " + string(d.Status),
+			Message:   "Deployment " + d.Project.Name + " (" + sha + ") - " + string(d.Status),
 			Severity:  severity,
 			Timestamp: d.CreatedAt.Format(time.RFC3339),
 		})
