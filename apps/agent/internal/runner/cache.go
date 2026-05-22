@@ -43,6 +43,30 @@ func extractCache(projectID, workDir string) error {
 			return err
 		}
 
+		// Handle symbolic link extraction
+		if f.Mode()&os.ModeSymlink != 0 {
+			rc, err := f.Open()
+			if err != nil {
+				return err
+			}
+			targetBytes, err := io.ReadAll(rc)
+			rc.Close()
+			if err != nil {
+				return err
+			}
+			target := string(targetBytes)
+
+			// Remove existing file/symlink if any
+			if err := os.Remove(fpath); err != nil && !os.IsNotExist(err) {
+				return err
+			}
+
+			if err := os.Symlink(target, fpath); err != nil {
+				return fmt.Errorf("failed to create symlink: %w", err)
+			}
+			continue
+		}
+
 		outFile, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
 		if err != nil {
 			return err
@@ -118,25 +142,36 @@ func saveCache(projectID, workDir string, paths []string) error {
 
 			if info.IsDir() {
 				header.Method = zip.Store
-			} else {
-				header.Method = zip.Deflate
-			}
-
-			writer, err := w.CreateHeader(header)
-			if err != nil {
+				_, err = w.CreateHeader(header)
 				return err
 			}
 
-			if info.IsDir() {
-				return nil
+			if info.Mode()&os.ModeSymlink != 0 {
+				linkTarget, err := os.Readlink(path)
+				if err != nil {
+					return err
+				}
+				header.Method = zip.Store
+				writer, err := w.CreateHeader(header)
+				if err != nil {
+					return err
+				}
+				_, err = writer.Write([]byte(filepath.ToSlash(linkTarget)))
+				return err
+			}
+
+			header.Method = zip.Deflate
+			writer, err := w.CreateHeader(header)
+			if err != nil {
+				return err
 			}
 
 			file, err := os.Open(path)
 			if err != nil {
 				return err
 			}
-			defer file.Close()
 			_, err = io.Copy(writer, file)
+			file.Close()
 			return err
 		})
 		if err != nil {
