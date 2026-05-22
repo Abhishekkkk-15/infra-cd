@@ -110,6 +110,9 @@ func main() {
 		auth.POST("/register", handlers.Register)
 	}
 
+	// Webhook Trigger (public)
+	api.POST("/deployments/webhook/trigger", handlers.TriggerDeploymentWebhook)
+
 	// Protected UI Group
 	ui := r.Group("/api/v1")
 	ui.Use(middleware.RequireAuth())
@@ -122,6 +125,7 @@ func main() {
 		projects.GET("/:id", handlers.GetProjectByID)
 		projects.PUT("/:id", handlers.UpdateProject)
 		projects.DELETE("/:id", handlers.DeleteProject)
+		projects.POST("/:id/rotate-token", handlers.RotateProjectDeployToken)
 
 		// Env vars (nested under project)
 		projects.GET("/:id/env", handlers.ListEnvVars)

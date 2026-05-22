@@ -176,3 +176,26 @@ func GetPendingDeployments(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, deployments)
 }
+
+// TriggerDeploymentWebhook handles POST /deployments/webhook/trigger (Public endpoint)
+func TriggerDeploymentWebhook(c *gin.Context) {
+	var body struct {
+		ProjectID uuid.UUID `json:"project_id" binding:"required"`
+		Token     string    `json:"token" binding:"required"`
+		Branch    string    `json:"branch"`
+		CommitSHA string    `json:"commit_sha"`
+	}
+
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	deployment, err := services.TriggerDeploymentWithToken(body.ProjectID, body.Token, body.Branch, body.CommitSHA)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, deployment)
+}

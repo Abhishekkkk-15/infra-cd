@@ -54,6 +54,7 @@ export interface Project {
   agent_id?: string;
   created_at: string;
   updated_at: string;
+  deploy_token: string;
 
   // Derived/computed — populated by frontend from deployment list
   lastDeploymentStatus?: DeploymentStatus;

@@ -1,6 +1,12 @@
 package models
 
-import "github.com/google/uuid"
+import (
+	"crypto/rand"
+	"encoding/hex"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
 
 type Project struct {
 	ID                   uuid.UUID              `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
@@ -14,8 +20,20 @@ type Project struct {
 	DeployScript         string                 `gorm:"type:text" json:"deploy_script"`
 	UserID               uuid.UUID              `json:"user_id"`
 	AgentID              *uuid.UUID             `json:"agent_id"`
+	DeployToken          string                 `gorm:"unique" json:"deploy_token"`
 	BaseModel
 	Deployment           []Deployment           `gorm:"constraint:OnDelete:CASCADE;" json:"-"`
 	EnvironmentVariables []EnvironmentVariable  `gorm:"constraint:OnDelete:CASCADE;" json:"-"`
 	Webhooks             []Webhook              `gorm:"constraint:OnDelete:CASCADE;" json:"-"`
+}
+
+func (p *Project) BeforeCreate(tx *gorm.DB) (err error) {
+	if p.DeployToken == "" {
+		bytes := make([]byte, 24)
+		if _, err := rand.Read(bytes); err != nil {
+			return err
+		}
+		p.DeployToken = "icd_proj_" + hex.EncodeToString(bytes)
+	}
+	return nil
 }

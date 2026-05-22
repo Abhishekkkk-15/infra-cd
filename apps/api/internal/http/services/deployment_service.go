@@ -52,6 +52,45 @@ func TriggerDeployment(projectID uuid.UUID) (models.Deployment, error) {
 	return d, nil
 }
 
+// TriggerDeploymentWithToken verifies project ID and deploy token, creates a deployment, and starts it.
+func TriggerDeploymentWithToken(projectID uuid.UUID, token string, branch string, commitSHA string) (models.Deployment, error) {
+	var project models.Project
+	if err := db.DB.First(&project, "id = ? AND deploy_token = ?", projectID, token).Error; err != nil {
+		return models.Deployment{}, fmt.Errorf("invalid project ID or deploy token: %w", err)
+	}
+
+	deployBranch := branch
+	if deployBranch == "" {
+		deployBranch = project.Branch
+	}
+
+	d := models.Deployment{
+		ProjectID: projectID,
+		Status:    models.DeploymentPending,
+		Branch:    deployBranch,
+		CommitSHA: commitSHA,
+	}
+
+	if project.AgentID != nil {
+		d.AgentID = project.AgentID
+	} else {
+		var agent models.Agent
+		if err := db.DB.Where("status = ?", models.AgentOnline).First(&agent).Error; err == nil {
+			d.AgentID = &agent.ID
+		}
+	}
+
+	if err := db.DB.Create(&d).Error; err != nil {
+		return d, err
+	}
+
+	if d.AgentID == nil {
+		go deployment.Run(d.ID)
+	}
+
+	return d, nil
+}
+
 func ListDeploymentsByProject(projectID uuid.UUID) ([]models.Deployment, error) {
 	var deployments []models.Deployment
 	err := db.DB.

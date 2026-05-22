@@ -129,3 +129,26 @@ func DeleteProject(c *gin.Context) {
 	}
 	c.JSON(http.StatusNoContent, nil)
 }
+
+// RotateProjectDeployToken handles POST /projects/:id/rotate-token
+func RotateProjectDeployToken(c *gin.Context) {
+	userID, err := getUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project id"})
+		return
+	}
+
+	token, err := services.RotateDeployToken(id, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"deploy_token": token})
+}

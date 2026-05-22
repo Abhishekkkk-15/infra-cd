@@ -81,6 +81,7 @@ export const ProjectDetails: React.FC = () => {
   // Secrets manager UI states
   const [revealedSecrets, setRevealedSecrets] = useState<Record<string, boolean>>({});
   const [yamlConfig, setYamlConfig] = useState(defaultYamlConfig);
+  const [showDeployToken, setShowDeployToken] = useState(false);
 
   // Zod form binding
   const { register: registerEnv, handleSubmit: handleEnvSubmit, reset: resetEnv, formState: { errors: envErrors } } = useForm<EnvVarForm>({
@@ -223,6 +224,21 @@ export const ProjectDetails: React.FC = () => {
     onSuccess: () => {
       notification.warning('Project Deleted', 'Indexed files removed from node storage.');
       navigate('/projects');
+    }
+  });
+
+  const rotateDeployTokenMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiClient.post(`/projects/${id}/rotate-token`);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      notification.success('Token Rotated', 'Project deploy token rotated successfully.');
+    },
+    onError: (err: unknown) => {
+      const message = err instanceof Error ? err.message : 'Could not rotate deploy token.';
+      notification.error('Rotation failed', message);
     }
   });
 
@@ -705,6 +721,118 @@ export const ProjectDetails: React.FC = () => {
               <option key={a.id} value={a.id}>{a.name} ({a.status})</option>
             ))}
           </select>
+        </div>
+
+        {/* Project Deploy Token Section */}
+        <div className="p-4 bg-zinc-950 border border-zinc-850 rounded-xl space-y-4 font-mono">
+          <h4 className="text-sm font-bold text-zinc-300 flex items-center gap-1.5 font-sans">
+            <Radio className="w-4 h-4 text-emerald-400" /> Project Deploy Token
+          </h4>
+          <p className="text-zinc-500 leading-relaxed font-sans text-xs">
+            Use this token to trigger project deployments from external CI/CD pipelines (like GitHub Actions, GitLab CI, or local terminals).
+          </p>
+
+          <div className="flex items-center gap-3">
+            <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 flex items-center justify-between font-mono text-xs text-zinc-300">
+              <span className="select-all truncate">
+                {showDeployToken ? project.deploy_token : '••••••••••••••••••••••••••••••••••••••••••••••••'}
+              </span>
+              <div className="flex items-center gap-2 shrink-0 ml-4">
+                <button
+                  onClick={() => setShowDeployToken(!showDeployToken)}
+                  className="p-1 text-zinc-500 hover:text-zinc-300 transition cursor-pointer"
+                  title={showDeployToken ? 'Hide Token' : 'Show Token'}
+                >
+                  {showDeployToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+                <button
+                  onClick={() => copyToClipboard(project.deploy_token || '', 'Deploy Token')}
+                  className="p-1 text-zinc-500 hover:text-zinc-300 transition cursor-pointer"
+                  title="Copy Token"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                if (confirm('Are you sure you want to rotate the deploy token? Any existing CI/CD workflows using the old token will fail.')) {
+                  rotateDeployTokenMutation.mutate();
+                }
+              }}
+              disabled={rotateDeployTokenMutation.isPending}
+              className="px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-850 text-zinc-300 font-mono text-xs font-bold border border-zinc-800 hover:border-zinc-700 transition cursor-pointer shrink-0"
+            >
+              {rotateDeployTokenMutation.isPending ? 'Rotating...' : 'Rotate Token'}
+            </button>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-zinc-900 space-y-3">
+            <h5 className="text-xs font-bold text-zinc-400 font-sans">Triggering Deployments</h5>
+
+            {/* Quick Curl example */}
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-bold text-zinc-500 block uppercase font-sans">Curl Request Example</span>
+              <div className="bg-zinc-900/60 border border-zinc-850 rounded-lg p-2.5 relative group font-mono text-[11px] leading-relaxed text-zinc-400">
+                <pre className="overflow-x-auto whitespace-pre-wrap break-all pr-8">
+                  {`curl -X POST \\
+  \${window.location.origin}/api/v1/deployments/webhook/trigger \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "project_id": "${project.id}",
+    "token": "${project.deploy_token || 'YOUR_DEPLOY_TOKEN'}",
+    "branch": "${project.branch || 'main'}"
+  }'`}
+                </pre>
+                <button
+                  onClick={() => copyToClipboard(`curl -X POST \\\n  \${window.location.origin}/api/v1/deployments/webhook/trigger \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "project_id": "${project.id}",\n    "token": "${project.deploy_token}",\n    "branch": "${project.branch}"\n  }'`, 'Curl Command')}
+                  className="absolute right-2 top-2 p-1 text-zinc-500 hover:text-zinc-300 opacity-0 group-hover:opacity-100 transition cursor-pointer"
+                  title="Copy Command"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* GitHub Actions YAML integration example */}
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-bold text-zinc-500 block uppercase font-sans">GitHub Workflow Integration (.github/workflows/deploy.yml)</span>
+              <div className="bg-zinc-900/60 border border-zinc-850 rounded-lg p-2.5 relative group font-mono text-[11px] leading-relaxed text-zinc-400">
+                <pre className="overflow-x-auto whitespace-pre pr-8">
+                  {`name: Deploy App
+on:
+  push:
+    branches: [ ${project.branch || 'main'} ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Deploy
+        run: |
+          curl -X POST \\
+            \${window.location.origin}/api/v1/deployments/webhook/trigger \\
+            -H "Content-Type: application/json" \\
+            -d '{
+              "project_id": "${project.id}",
+              "token": "\${{ secrets.INFRA_CD_DEPLOY_TOKEN }}",
+              "branch": "\${{ github.ref_name }}",
+              "commit_sha": "\${{ github.sha }}"
+            }'`}
+                </pre>
+                <button
+                  onClick={() => copyToClipboard(`name: Deploy App\non:\n  push:\n    branches: [ ${project.branch || 'main'} ]\n\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Trigger Deploy\n        run: |\n          curl -X POST \\\n            \${window.location.origin}/api/v1/deployments/webhook/trigger \\\n            -H "Content-Type: application/json" \\\n            -d '{\n              "project_id": "${project.id}",\n              "token": "\${{ secrets.INFRA_CD_DEPLOY_TOKEN }}",\n              "branch": "\${{ github.ref_name }}",\n              "commit_sha": "\${{ github.sha }}"\n            }'`, 'GitHub Actions YAML')}
+                  className="absolute right-2 top-2 p-1 text-zinc-500 hover:text-zinc-300 opacity-0 group-hover:opacity-100 transition cursor-pointer"
+                  title="Copy YAML"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <span className="text-[10px] text-zinc-500 block font-sans">
+                💡 Save the Deploy Token as a GitHub secret named <code className="text-zinc-400 bg-zinc-950 px-1 py-0.5 rounded border border-zinc-850 font-mono">INFRA_CD_DEPLOY_TOKEN</code> in your repository settings.
+              </span>
+            </div>
+          </div>
         </div>
 
         <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-xl space-y-3">

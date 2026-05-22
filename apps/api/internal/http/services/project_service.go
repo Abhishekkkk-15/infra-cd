@@ -1,11 +1,30 @@
 package services
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+
 	"github.com/abhishekkkk-15/infra-cd/api/internal/db"
 	"github.com/abhishekkkk-15/infra-cd/api/internal/db/models"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
+
+func RotateDeployToken(projectID uuid.UUID, userID uuid.UUID) (string, error) {
+	bytes := make([]byte, 24)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	newToken := "icd_proj_" + hex.EncodeToString(bytes)
+
+	err := db.DB.Model(&models.Project{}).
+		Where("id = ? AND user_id = ?", projectID, userID).
+		Update("deploy_token", newToken).Error
+	if err != nil {
+		return "", err
+	}
+	return newToken, nil
+}
 
 func CreateProject(project *models.Project) error {
 	return db.DB.Create(project).Error
