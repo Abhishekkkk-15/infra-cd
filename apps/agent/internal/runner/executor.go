@@ -15,8 +15,9 @@ import (
 )
 
 type ExecutionContext struct {
-	Client   *client.Client
-	DeployID string
+	Client    *client.Client
+	DeployID  string
+	BuildPath string
 }
 
 func executeStep(ctx *ExecutionContext, name, command string, order int, execFunc func() error) error {
@@ -56,8 +57,9 @@ func executeStep(ctx *ExecutionContext, name, command string, order int, execFun
 
 func RunDeployment(c *client.Client, d client.Deployment) error {
 	ctx := &ExecutionContext{
-		Client:   c,
-		DeployID: d.ID,
+		Client:    c,
+		DeployID:  d.ID,
+		BuildPath: d.Project.BuildPath,
 	}
 
 	workDir := filepath.Join(os.TempDir(), "infracd-workspace", d.ID)
@@ -115,9 +117,31 @@ func RunDeployment(c *client.Client, d client.Deployment) error {
 	})
 
 	// 5. Execute pipeline or fallback deploy script
-	configPath := filepath.Join(workDir, ".infra-cd.yaml")
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		configPath = filepath.Join(workDir, ".infra-cd.yml")
+	// Look inside the project's build path first if specified
+	var configPath string
+	if d.Project.BuildPath != "" {
+		p := filepath.Join(workDir, d.Project.BuildPath, ".infra-cd.yaml")
+		if _, err := os.Stat(p); err == nil {
+			configPath = p
+		} else {
+			p = filepath.Join(workDir, d.Project.BuildPath, ".infra-cd.yml")
+			if _, err := os.Stat(p); err == nil {
+				configPath = p
+			}
+		}
+	}
+
+	// Fallback to repository root
+	if configPath == "" {
+		p := filepath.Join(workDir, ".infra-cd.yaml")
+		if _, err := os.Stat(p); err == nil {
+			configPath = p
+		} else {
+			p = filepath.Join(workDir, ".infra-cd.yml")
+			if _, err := os.Stat(p); err == nil {
+				configPath = p
+			}
+		}
 	}
 
 	if _, err := os.Stat(configPath); err == nil {
@@ -228,11 +252,11 @@ func (ctx *ExecutionContext) runScript(workDir string, job Job, envList []string
 		cmd := exec.Command("docker", "run", "--rm",
 			"--env-file", "/workspace/.infra_cd_env",
 			"-v", workDir+":/workspace",
-			"-w", "/workspace",
+			"-w", filepath.ToSlash(filepath.Join("/workspace", ctx.BuildPath)),
 			job.Image,
-			"sh", ".infra_cd_run.sh",
+			"sh", "/workspace/.infra_cd_run.sh",
 		)
-		cmd.Dir = workDir
+		cmd.Dir = filepath.Join(workDir, ctx.BuildPath)
 		return ctx.streamCommand(cmd, nil)
 	}
 
@@ -249,7 +273,7 @@ func (ctx *ExecutionContext) runScript(workDir string, job Job, envList []string
 		cmd = exec.Command("sh", "-e", "-c", job.Script)
 	}
 
-	cmd.Dir = workDir
+	cmd.Dir = filepath.Join(workDir, ctx.BuildPath)
 	return ctx.streamCommand(cmd, envList)
 }
 

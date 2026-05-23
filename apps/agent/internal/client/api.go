@@ -35,6 +35,7 @@ type Project struct {
 	ID           string `json:"id"`
 	RepoURL      string `json:"repo_url"`
 	Branch       string `json:"branch"`
+	BuildPath    string `json:"build_path"`
 	IsDockerized bool   `json:"is_dockerized"`
 	DeployScript string `json:"deploy_script"`
 }
