@@ -1,157 +1,119 @@
-# Go Boilerplate
+# infra-cd 🚀
 
-A production-ready monorepo template for building scalable web applications with Go backend and TypeScript frontend. Built with modern best practices, clean architecture, and comprehensive tooling.
+**infra-cd** is a lightweight, self-hosted Continuous Deployment (CD) platform. It allows developers to register Git repositories (projects), manage environments, and orchestrate automated builds and deployments on remote target servers/machines via a lightweight agent.
+
+---
+
+## Architecture & Monorepo Layout
+
+This repository is organized as a Turborepo-managed monorepo using pnpm workspaces:
+
+```
+infra-cd/
+├── apps/
+│   ├── api/        # Central Go REST API (Gin + GORM + PostgreSQL)
+│   ├── web/        # React Web Dashboard (Vite + Monaco Editor + Tailwind)
+│   └── agent/      # Lightweight VM Runner Agent (polls API and runs pipelines)
+├── packages/
+│   ├── openapi/    # Shared API Contract (ts-rest & OpenAPI 3.0 spec)
+│   └── zod/        # Shared validation schemas (Zod)
+├── turbo.json      # Turborepo build configuration
+└── pnpm-workspace.yaml
+```
+
+---
 
 ## Features
 
-- **Monorepo Structure**: Organized with Turborepo for efficient builds and development
-- **Go Backend**: High-performance REST API with Echo framework
-- **Authentication**: Integrated Clerk SDK for secure user management
-- **Database**: PostgreSQL with migrations and connection pooling
-- **Background Jobs**: Redis-based async job processing with Asynq
-- **Observability**: New Relic APM integration and structured logging
-- **Email Service**: Transactional emails with Resend and HTML templates
-- **Testing**: Comprehensive test infrastructure with Testcontainers
-- **API Documentation**: OpenAPI/Swagger specification
-- **Security**: Rate limiting, CORS, secure headers, and JWT validation
+- **Centralized Dashboard**: A modern, dark-mode dashboard to monitor project status, trigger deployments, rotate tokens, assign agents, and manage environment variables.
+- **Lightweight Runner Agent**: A secure, Go-based agent that runs on your deployment VMs, polls the central server for jobs, clones repos, and executes pipeline commands.
+- **Real-Time Logs**: View execution steps and real-time stderr/stdout logs in the dashboard.
+- **Git Webhook Triggering**: Automatic pipeline triggers when code is pushed to your Git branches (supports GitHub webhooks).
+- **Flexible Pipeline Config (`.infra-cd.yaml`)**: Define complex stages, sandboxed container runners (Docker), directories to cache, and monorepo directory filters.
+- **Database-first Configuration & Git Synchronization**: Edit pipelines directly in the Web UI editor (stored in DB) OR commit them in your Git repo. When the agent deploys, it automatically synchronizes Git configurations back to the central server database.
 
-## Project Structure
-
-```
-go-boilerplate/
-├── apps/backend/          # Go backend application
-├── packages/         # Frontend packages (React, Vue, etc.)
-├── package.json      # Monorepo configuration
-├── turbo.json        # Turborepo configuration
-└── README.md         # This file
-```
+---
 
 ## Quick Start
 
 ### Prerequisites
 
-- Go 1.24 or higher
-- Node.js 22+ and pnpm
-- PostgreSQL 16+
-- Redis 8+
+- **Go** (1.26 or higher)
+- **Node.js** (22+ and pnpm)
+- **PostgreSQL** (16+)
 
-### Installation
+### Installation & Development
 
-1. Clone the repository:
-```bash
-git clone https://github.com/sriniously/go-boilerplate.git
-cd go-boilerplate
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/abhishekkkk-15/infra-cd.git
+   cd infra-cd
+   ```
+
+2. **Install Dependencies**:
+   ```bash
+   pnpm install
+   ```
+
+3. **Configure Environment Variables**:
+   Create a `.env` file in `apps/api/` matching your database and environment settings:
+   ```bash
+   cp apps/api/.env.example apps/api/.env
+   ```
+
+4. **Run Database Migrations**:
+   ```bash
+   cd apps/api
+   go run ./cmd/migrate
+   ```
+
+5. **Start Dev Servers (Monorepo)**:
+   From the root directory, start all services (API, Web, and Agent dependencies) concurrently:
+   ```bash
+   pnpm dev
+   ```
+   * Dashboard will be available at `http://localhost:5173`
+   * API Server will run at `http://localhost:8080`
+
+---
+
+## Pipeline Configuration (`.infra-cd.yaml`)
+
+Define your build and deployment instructions inside a `.infra-cd.yaml` file in the root of your project or in your project's monorepo subdirectory.
+
+### Configuration Format
+
+```yaml
+# infra-cd build configuration
+version: "1.0"
+
+# Directories to archive and restore between build runs
+cache:
+  - .go/cache
+  - node_modules
+
+# Sequential list of execution jobs
+jobs:
+  - name: "Build API Backend"
+    script: |
+      echo "Building Go API server..."
+      go build -o api ./cmd/infra-cd/main.go
+    paths:
+      - apps/api/**      # Only run if files in this path change (monorepo filter)
+
+  - name: "Run API Tests"
+    script: |
+      echo "Running Go tests..."
+      go test ./...
+    image: golang:1.26-alpine  # Run this job inside a sandboxed container
 ```
 
-2. Install dependencies:
-```bash
-pnpm install
+---
 
-# Install backend dependencies
-cd apps/backend
-go mod download
-```
+## Database-first UI Configuration
 
-3. Set up environment variables:
-```bash
-cp apps/backend/.env.example apps/backend/.env
-# Edit apps/backend/.env with your configuration
-```
+You can configure pipelines in two ways:
+1. **Git Repository**: Save `.infra-cd.yaml` in your repository. The agent will read it on deployment and synchronize the configuration back to the web dashboard automatically.
+2. **Web UI Editor**: Open the project details, click on the **Build Config** tab, write your YAML config in the Monaco editor, and click **SAVE FILE**. The agent will prioritize this database-stored configuration on subsequent deployment runs.
 
-4. Start the database and Redis.
-
-5. Run database migrations:
-```bash
-cd apps/backend
-task migrations:up
-```
-
-6. Start the development server:
-```bash
-# From root directory
-pnpm dev
-
-# Or just the backend
-cd apps/backend
-task run
-```
-
-The API will be available at `http://localhost:8080`
-
-## Development
-
-### Available Commands
-
-```bash
-# Backend commands (from backend/ directory)
-task help              # Show all available tasks
-task run               # Run the application
-task migrations:new    # Create a new migration
-task migrations:up     # Apply migrations
-task test              # Run tests
-task tidy              # Format code and manage dependencies
-
-# Frontend commands (from root directory)
-pnpm dev               # Start development servers
-pnpm build             # Build all packages
-pnpm lint              # Lint all packages
-```
-
-### Environment Variables
-
-The backend uses environment variables prefixed with `BOILERPLATE_`. Key variables include:
-
-- `BOILERPLATE_DATABASE_*` - PostgreSQL connection settings
-- `BOILERPLATE_SERVER_*` - Server configuration
-- `BOILERPLATE_AUTH_*` - Authentication settings
-- `BOILERPLATE_REDIS_*` - Redis connection
-- `BOILERPLATE_EMAIL_*` - Email service configuration
-- `BOILERPLATE_OBSERVABILITY_*` - Monitoring settings
-
-See `apps/backend/.env.example` for a complete list.
-
-## Architecture
-
-This boilerplate follows clean architecture principles:
-
-- **Handlers**: HTTP request/response handling
-- **Services**: Business logic implementation
-- **Repositories**: Data access layer
-- **Models**: Domain entities
-- **Infrastructure**: External services (database, cache, email)
-
-## Testing
-
-```bash
-# Run backend tests
-cd apps/backend
-go test ./...
-
-# Run with coverage
-go test -cover ./...
-
-# Run integration tests (requires Docker)
-go test -tags=integration ./...
-```
-
-### Production Considerations
-
-1. Use environment-specific configuration
-2. Enable production logging levels
-3. Configure proper database connection pooling
-4. Set up monitoring and alerting
-5. Use a reverse proxy (nginx, Caddy)
-6. Enable rate limiting and security headers
-7. Configure CORS for your domains
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+*To revert to using Git-based configuration files, clear all text in the Web UI editor and click **SAVE FILE**.*
