@@ -161,19 +161,24 @@ export const DeploymentDetails: React.FC = () => {
           <p className="text-[11px] text-zinc-500 font-mono mt-0.5">Project: {(deployment as any).Project?.name || deployment.project_id}</p>
         </div>
 
-        {/* Deployments Rollback actions */}
-        {deployment.status === 'success' && (
+        {/* Deployments Rollback/Redeploy actions */}
+        {(deployment.status === 'success' || deployment.status === 'failed') && (
           <button
             onClick={() => {
-              if (confirm(`Trigger rollback? This will compile a new deployment from commit ${deployment.commit_sha}`)) {
+              const actionName = deployment.status === 'failed' ? 're-deploy' : 'rollback';
+              if (confirm(`Trigger ${actionName}? This will compile a new deployment from commit ${deployment.commit_sha}`)) {
                 rollbackMutation.mutate();
               }
             }}
             disabled={rollbackMutation.isPending}
-            className="ml-auto flex items-center gap-2 h-9 px-3.5 rounded-lg text-xs font-mono font-bold border border-zinc-800 bg-zinc-900 hover:bg-zinc-850 hover:text-zinc-200 transition cursor-pointer text-zinc-400 shadow-md"
+            className={`ml-auto flex items-center gap-2 h-9 px-3.5 rounded-lg text-xs font-mono font-bold border transition cursor-pointer shadow-md ${
+              deployment.status === 'failed' 
+                ? 'border-blue-500/20 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300' 
+                : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:bg-zinc-850 hover:text-zinc-200'
+            }`}
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>ROLLBACK DEPLOYMENT</span>
+            <span>{deployment.status === 'failed' ? 'RE-DEPLOY' : 'ROLLBACK'}</span>
           </button>
         )}
       </div>
