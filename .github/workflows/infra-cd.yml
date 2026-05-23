@@ -2,6 +2,8 @@ name: Deploy App
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'apps/api/**'
 
 jobs:
   deploy:
