@@ -7,6 +7,9 @@ jobs:
 
   - name: "Install & Restart Service"
     script: |
+      echo "Stopping existing service to prevent Text file busy error..."
+      sudo systemctl stop infra-cd-api || true
+
       echo "Copying binary to /usr/local/bin/..."
       sudo cp ./api /usr/local/bin/infra-cd-api
       sudo chmod +x /usr/local/bin/infra-cd-api
