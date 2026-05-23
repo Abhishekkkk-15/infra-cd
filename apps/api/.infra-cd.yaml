@@ -12,27 +12,27 @@ jobs:
       chmod +x /usr/local/bin/infra-cd-api
 
       echo "Writing systemd unit file..."
-      cat > /etc/systemd/system/infra-cd-api.service << 'EOF'
-      [Unit]
-      Description=infra-cd API Server
-      After=network.target
-      Wants=network-online.target
+      sudo tee /etc/systemd/system/infra-cd-api.service > /dev/null << 'EOF'
+[Unit]
+Description=infra-cd API Server
+After=network.target
+Wants=network-online.target
 
-      [Service]
-      ExecStart=/usr/local/bin/infra-cd-api
-      Restart=always
-      RestartSec=5
-      StandardOutput=journal
-      StandardError=journal
-      SyslogIdentifier=infra-cd-api
-      WorkingDirectory=/usr/local/bin
+[Service]
+ExecStart=/usr/local/bin/infra-cd-api
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=infra-cd-api
+WorkingDirectory=/usr/local/bin
 
-      [Install]
-      WantedBy=multi-user.target
-      EOF
+[Install]
+WantedBy=multi-user.target
+EOF
 
       echo "Reloading systemd and restarting service..."
-      systemctl daemon-reload
-      systemctl enable infra-cd-api
-      systemctl restart infra-cd-api
-      systemctl is-active --quiet infra-cd-api && echo "Service started successfully." || (echo "Service failed to start!" && exit 1)
+      sudo systemctl daemon-reload
+      sudo systemctl enable infra-cd-api
+      sudo systemctl restart infra-cd-api
+      sudo systemctl is-active --quiet infra-cd-api && echo "Service started successfully." || (echo "Service failed to start!" && journalctl -u infra-cd-api -n 20 --no-pager && exit 1)

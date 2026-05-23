@@ -241,8 +241,62 @@ func RunDeployment(c *client.Client, d client.Deployment) error {
 	return nil
 }
 
+
+// agentServiceName returns the systemd service name for this agent process.
+// Reads INFRACD_AGENT_SERVICE env var, defaults to "infra-cd-agent".
+func agentServiceName() string {
+	if name := os.Getenv("INFRACD_AGENT_SERVICE"); name != "" {
+		return name
+	}
+	return "infra-cd-agent"
+}
+
+// checkScriptSafety rejects scripts that would stop, kill, disable, or mask the
+// running agent service — preventing the agent from terminating itself mid-deployment.
+func checkScriptSafety(script string) error {
+	agentSvc := agentServiceName()
+	agentPID := os.Getpid()
+
+	// Dangerous systemctl verbs that would take the agent offline
+	dangerousVerbs := []string{"stop", "kill", "disable", "mask", "restart"}
+
+	for _, line := range strings.Split(script, "\n") {
+		trimmed := strings.TrimSpace(line)
+		// Skip comments
+		if strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		// Check for systemctl <dangerous-verb> <agent-service>
+		for _, verb := range dangerousVerbs {
+			if strings.Contains(trimmed, "systemctl") &&
+				strings.Contains(trimmed, verb) &&
+				strings.Contains(trimmed, agentSvc) {
+				return fmt.Errorf(
+					"SAFETY VIOLATION: script attempts to %s the agent service '%s'. "+
+						"Pipeline jobs may not control the agent process. Remove this command and redeploy",
+					verb, agentSvc,
+				)
+			}
+		}
+		// Check for kill commands targeting the agent's own PID
+		agentPIDStr := fmt.Sprintf("%d", agentPID)
+		if (strings.Contains(trimmed, "kill ") || strings.Contains(trimmed, "pkill ")) &&
+			strings.Contains(trimmed, agentPIDStr) {
+			return fmt.Errorf(
+				"SAFETY VIOLATION: script attempts to kill the agent process (PID %d). "+
+					"Pipeline jobs may not signal the agent process",
+				agentPID,
+			)
+		}
+	}
+	return nil
+}
+
 func (ctx *ExecutionContext) runScript(workDir string, job Job, envList []string) error {
 	if job.Image != "" {
+		if err := checkScriptSafety(job.Script); err != nil {
+			return err
+		}
 		ctx.logInfo(fmt.Sprintf("Running job inside sandboxed container: %s", job.Image))
 
 		// 1. Write the script content to .infra_cd_run.sh with Unix line endings
@@ -281,6 +335,12 @@ func (ctx *ExecutionContext) runScript(workDir string, job Job, envList []string
 	}
 
 	var cmd *exec.Cmd
+
+	// Safety check — must run before any execution path
+	if err := checkScriptSafety(job.Script); err != nil {
+		return err
+	}
+
 	if runtime.GOOS == "windows" {
 		scriptPath := filepath.Join(workDir, fmt.Sprintf("step_%d.ps1", time.Now().UnixNano()))
 		psScript := "$ErrorActionPreference = 'Stop'\n" + job.Script
