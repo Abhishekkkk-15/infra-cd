@@ -112,6 +112,9 @@ export const ProjectDetails: React.FC = () => {
   useEffect(() => {
     if (projectBase) {
       setBuildPath(projectBase.build_path || '');
+      if (projectBase.pipeline_config !== undefined) {
+        setYamlConfig(projectBase.pipeline_config || '');
+      }
     }
   }, [projectBase]);
   const { data: envVars = [] } = useQuery({
@@ -174,6 +177,19 @@ export const ProjectDetails: React.FC = () => {
     },
     onError: (err: any) => {
       notification.error('Error saving build path', err.message || 'Update failed');
+    }
+  });
+
+  const updatePipelineConfigMutation = useMutation({
+    mutationFn: async (config: string) => {
+      return apiClient.put(`/projects/${id}`, { pipeline_config: config });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      notification.success('Pipeline Config Saved', 'Configuration saved to database.');
+    },
+    onError: (err: any) => {
+      notification.error('Error saving config', err.message || 'Update failed');
     }
   });
 
@@ -705,12 +721,13 @@ export const ProjectDetails: React.FC = () => {
 
           <button
             onClick={() => {
-              notification.success('File Saved', 'Configuration saved to project environment.');
+              updatePipelineConfigMutation.mutate(yamlConfig);
             }}
+            disabled={updatePipelineConfigMutation.isPending}
             className="flex items-center gap-1 px-3 h-8 rounded text-xs font-mono font-bold bg-emerald-500 hover:bg-emerald-400 text-zinc-950 shadow transition cursor-pointer"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
-            <span>SAVE FILE</span>
+            <span>{updatePipelineConfigMutation.isPending ? 'SAVING...' : 'SAVE FILE'}</span>
           </button>
         </div>
 

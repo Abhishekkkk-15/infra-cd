@@ -55,6 +55,7 @@ export interface Project {
   created_at: string;
   updated_at: string;
   deploy_token: string;
+  pipeline_config?: string;
 
   // Derived/computed — populated by frontend from deployment list
   lastDeploymentStatus?: DeploymentStatus;

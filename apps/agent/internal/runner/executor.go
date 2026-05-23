@@ -117,40 +117,52 @@ func RunDeployment(c *client.Client, d client.Deployment) error {
 	})
 
 	// 5. Execute pipeline or fallback deploy script
-	// Look inside the project's build path first if specified
-	var configPath string
-	if d.Project.BuildPath != "" {
-		p := filepath.Join(workDir, d.Project.BuildPath, ".infra-cd.yaml")
-		if _, err := os.Stat(p); err == nil {
-			configPath = p
-		} else {
-			p = filepath.Join(workDir, d.Project.BuildPath, ".infra-cd.yml")
-			if _, err := os.Stat(p); err == nil {
-				configPath = p
-			}
-		}
-	}
+	var config *PipelineConfig
 
-	// Fallback to repository root
-	if configPath == "" {
-		p := filepath.Join(workDir, ".infra-cd.yaml")
-		if _, err := os.Stat(p); err == nil {
-			configPath = p
-		} else {
-			p = filepath.Join(workDir, ".infra-cd.yml")
-			if _, err := os.Stat(p); err == nil {
-				configPath = p
-			}
-		}
-	}
-
-	if _, err := os.Stat(configPath); err == nil {
-		ctx.logInfo(fmt.Sprintf("Found %s, parsing pipeline configuration...", filepath.Base(configPath)))
-		config, err := ParsePipelineConfig(configPath)
+	if d.Project.PipelineConfig != "" {
+		ctx.logInfo("Using database-stored pipeline configuration...")
+		config, err = ParsePipelineConfigString(d.Project.PipelineConfig)
 		if err != nil {
-			return fmt.Errorf("invalid pipeline config: %v", err)
+			return fmt.Errorf("invalid database pipeline config: %v", err)
+		}
+	} else {
+		// Look inside the project's build path first if specified
+		var configPath string
+		if d.Project.BuildPath != "" {
+			p := filepath.Join(workDir, d.Project.BuildPath, ".infra-cd.yaml")
+			if _, err := os.Stat(p); err == nil {
+				configPath = p
+			} else {
+				p = filepath.Join(workDir, d.Project.BuildPath, ".infra-cd.yml")
+				if _, err := os.Stat(p); err == nil {
+					configPath = p
+				}
+			}
 		}
 
+		// Fallback to repository root
+		if configPath == "" {
+			p := filepath.Join(workDir, ".infra-cd.yaml")
+			if _, err := os.Stat(p); err == nil {
+				configPath = p
+			} else {
+				p = filepath.Join(workDir, ".infra-cd.yml")
+				if _, err := os.Stat(p); err == nil {
+					configPath = p
+				}
+			}
+		}
+
+		if configPath != "" {
+			ctx.logInfo(fmt.Sprintf("Found %s, parsing pipeline configuration...", filepath.Base(configPath)))
+			config, err = ParsePipelineConfig(configPath)
+			if err != nil {
+				return fmt.Errorf("invalid pipeline config: %v", err)
+			}
+		}
+	}
+
+	if config != nil {
 		if len(config.Jobs) == 0 {
 			ctx.logInfo("No jobs defined in pipeline config.")
 		}

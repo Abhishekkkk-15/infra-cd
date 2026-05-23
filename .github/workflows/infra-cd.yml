@@ -1,0 +1,20 @@
+name: Deploy App
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Deploy
+        run: |
+          curl -X POST \
+            ${window.location.origin}/api/v1/deployments/webhook/trigger \
+            -H "Content-Type: application/json" \
+            -d '{
+              "project_id": "8cb1b78d-b773-4b86-aecd-4f3c12fa069a",
+              "token": "${{ secrets.INFRA_CD_DEPLOY_TOKEN }}",
+              "branch": "${{ github.ref_name }}",
+              "commit_sha": "${{ github.sha }}"
+            }'

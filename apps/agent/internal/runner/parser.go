@@ -34,3 +34,13 @@ func ParsePipelineConfig(filePath string) (*PipelineConfig, error) {
 
 	return &config, nil
 }
+
+// ParsePipelineConfigString unmarshals the pipeline config from a string
+func ParsePipelineConfigString(content string) (*PipelineConfig, error) {
+	var config PipelineConfig
+	if err := yaml.Unmarshal([]byte(content), &config); err != nil {
+		return nil, fmt.Errorf("failed to parse pipeline config: %w", err)
+	}
+
+	return &config, nil
+}

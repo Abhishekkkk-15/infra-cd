@@ -36,8 +36,9 @@ type Project struct {
 	RepoURL      string `json:"repo_url"`
 	Branch       string `json:"branch"`
 	BuildPath    string `json:"build_path"`
-	IsDockerized bool   `json:"is_dockerized"`
-	DeployScript string `json:"deploy_script"`
+	IsDockerized   bool   `json:"is_dockerized"`
+	DeployScript   string `json:"deploy_script"`
+	PipelineConfig string `json:"pipeline_config"`
 }
 
 type Deployment struct {

@@ -61,6 +61,7 @@ const initialProjects: Project[] = [
     buildCommand: "go build -o server cmd/api/main.go",
     startCommand: "./server",
     isDockerized: true,
+    pipeline_config: `# infra-cd build configuration\nversion: "1.0"\njobs:\n  - name: "Build API Gateway"\n    script: |\n      echo "Building Go API Gateway..."\n      go build -o server cmd/api/main.go\n`,
     envVars: [
       {
         id: "env-1",

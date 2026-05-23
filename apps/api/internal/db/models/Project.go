@@ -18,6 +18,7 @@ type Project struct {
 	IsDockerized         bool                   `json:"is_dockerized"`
 	DockerfilePath       string                 `json:"dockerfile_path"`
 	DeployScript         string                 `gorm:"type:text" json:"deploy_script"`
+	PipelineConfig       string                 `gorm:"type:text" json:"pipeline_config"`
 	UserID               uuid.UUID              `json:"user_id"`
 	AgentID              *uuid.UUID             `json:"agent_id"`
 	DeployToken          string                 `gorm:"unique" json:"deploy_token"`
