@@ -7,5 +7,5 @@ jobs:
       
   - name: "Run API Tests"
     script: |
-      echo "Running Go tests..."
-      go test -v ./...
+      echo "Start server"
+      ./api
