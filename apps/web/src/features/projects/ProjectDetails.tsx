@@ -44,34 +44,16 @@ type WebhookForm = z.infer<typeof webhookSchema>;
 // Monaco default YAML template
 const defaultYamlConfig = `# infra-cd build configuration
 version: "1.0"
-pipeline:
-  stages:
-    - checkout
-    - lint
-    - build
-    - deploy
+jobs:
+  - name: "Build API Backend"
+    script: |
+      echo "Building Go API server..."
+      go build -o api ./cmd/infra-cd/main.go
 
-  checkout:
-    image: alpine/git:latest
-    commands:
-      - git clone --depth=1 \${INFRA_REPO_URL} .
-
-  lint:
-    image: node:20-alpine
-    commands:
-      - npm ci
-      - npm run lint
-
-  build:
-    dockerfile: Dockerfile
-    image_tag: registry.infra-cd.internal/\${INFRA_PROJECT_NAME}:latest
-    push: true
-
-  deploy:
-    orchestrator: kubernetes
-    replicas: 2
-    port: 8080
-    healthcheck: /health
+  - name: "Run API Tests"
+    script: |
+      echo "Running Go tests..."
+      go test ./...
 `;
 
 export const ProjectDetails: React.FC = () => {
