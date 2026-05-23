@@ -1,0 +1,11 @@
+version: "1.0"
+jobs:
+  - name: "Build API Backend"
+    script: |
+      echo "Building Go API server..."
+      go build -o api.exe ./cmd/infra-cd/main.go
+      
+  - name: "Run API Tests"
+    script: |
+      echo "Running Go tests..."
+      go test -v ./...

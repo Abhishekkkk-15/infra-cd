@@ -116,8 +116,12 @@ func RunDeployment(c *client.Client, d client.Deployment) error {
 
 	// 5. Execute pipeline or fallback deploy script
 	configPath := filepath.Join(workDir, ".infra-cd.yaml")
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		configPath = filepath.Join(workDir, ".infra-cd.yml")
+	}
+
 	if _, err := os.Stat(configPath); err == nil {
-		ctx.logInfo("Found .infra-cd.yaml, parsing pipeline configuration...")
+		ctx.logInfo(fmt.Sprintf("Found %s, parsing pipeline configuration...", filepath.Base(configPath)))
 		config, err := ParsePipelineConfig(configPath)
 		if err != nil {
 			return fmt.Errorf("invalid pipeline config: %v", err)

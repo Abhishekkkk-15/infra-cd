@@ -23,21 +23,22 @@ jobs:
       - name: Build Binaries
         run: |
           mkdir -p build
+          cd apps/agent
           
           # Linux AMD64
-          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o build/agent-linux-amd64 apps/agent/cmd/agent/main.go
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o ../../build/agent-linux-amd64 cmd/agent/main.go
           
           # Linux ARM64
-          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o build/agent-linux-arm64 apps/agent/cmd/agent/main.go
+          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ../../build/agent-linux-arm64 cmd/agent/main.go
           
           # Darwin AMD64 (macOS Intel)
-          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o build/agent-darwin-amd64 apps/agent/cmd/agent/main.go
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o ../../build/agent-darwin-amd64 cmd/agent/main.go
           
           # Darwin ARM64 (macOS Apple Silicon)
-          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o build/agent-darwin-arm64 apps/agent/cmd/agent/main.go
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o ../../build/agent-darwin-arm64 cmd/agent/main.go
           
           # Windows AMD64
-          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o build/agent-windows-amd64.exe apps/agent/cmd/agent/main.go
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o ../../build/agent-windows-amd64.exe cmd/agent/main.go
 
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v2
