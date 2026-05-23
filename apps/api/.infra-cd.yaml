@@ -11,6 +11,11 @@ jobs:
       sudo cp ./api /usr/local/bin/infra-cd-api
       sudo chmod +x /usr/local/bin/infra-cd-api
 
+      echo "Writing environment file from injected secrets..."
+      env | grep -E "^(DATABASE_URL|DB_HOST|DB_PORT|DB_USER|DB_PASSWORD|DB_NAME|DB_SSLMODE|PORT|APP_ENV|LOG_LEVEL|JWT_SECRET)=" | sudo tee /etc/infra-cd-api.env > /dev/null
+      sudo chmod 600 /etc/infra-cd-api.env
+      echo "  -> $(sudo wc -l < /etc/infra-cd-api.env) variable(s) written."
+
       echo "Writing systemd unit file..."
       sudo tee /etc/systemd/system/infra-cd-api.service > /dev/null << 'EOF'
       [Unit]
@@ -19,6 +24,7 @@ jobs:
       Wants=network-online.target
 
       [Service]
+      EnvironmentFile=/etc/infra-cd-api.env
       ExecStart=/usr/local/bin/infra-cd-api
       Restart=always
       RestartSec=5
@@ -35,4 +41,4 @@ jobs:
       sudo systemctl daemon-reload
       sudo systemctl enable infra-cd-api
       sudo systemctl restart infra-cd-api
-      sudo systemctl is-active --quiet infra-cd-api && echo "Service started successfully." || (echo "Service failed to start!" && sudo journalctl -u infra-cd-api -n 20 --no-pager && exit 1)
+      sudo systemctl is-active --quiet infra-cd-api && echo "Service started successfully." || (echo "Service failed to start!" && sudo journalctl -u infra-cd-api -n 30 --no-pager && exit 1)
