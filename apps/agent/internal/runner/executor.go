@@ -64,6 +64,8 @@ func RunDeployment(c *client.Client, d client.Deployment) error {
 	}
 
 	workDir := filepath.Join(os.TempDir(), "infracd-workspace", d.ID)
+	// Clean up any stale directory from a previous crashed run
+	_ = os.RemoveAll(workDir)
 	if err := os.MkdirAll(workDir, 0755); err != nil {
 		return fmt.Errorf("failed to create workdir: %v", err)
 	}

@@ -35,12 +35,14 @@ func NewWSClient(baseURL, agentID, token string) *WSClient {
 	wsURL := strings.Replace(baseURL, "http://", "ws://", 1)
 	wsURL = strings.Replace(wsURL, "https://", "wss://", 1)
 
-	return &WSClient{
+	wc := &WSClient{
 		baseURL:     wsURL,
 		agentID:     agentID,
 		token:       token,
 		sendChannel: make(chan WSMessage, 256), // buffer to prevent blocking
 	}
+	go wc.writePump() // Start write pump exactly once
+	return wc
 }
 
 func (wc *WSClient) Connect() error {
@@ -67,7 +69,7 @@ func (wc *WSClient) Connect() error {
 	slog.Info("Connected to server via WebSocket")
 
 	go wc.readPump()
-	go wc.writePump()
+	// writePump is already running in background
 
 	return nil
 }
@@ -166,10 +168,10 @@ func (wc *WSClient) writePump() {
 
 		if err := conn.WriteJSON(msg); err != nil {
 			slog.Error("WebSocket write failed", "error", err)
-			// Returning will terminate writePump, wait for reconnect to restart it
-			// Or we could close the conn to trigger readPump reconnect
 			conn.Close()
-			return
+			// Don't return! Just drop the message and keep looping. 
+			// readPump will handle the reconnect.
+			continue
 		}
 	}
 }
