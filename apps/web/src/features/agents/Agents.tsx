@@ -16,7 +16,7 @@ export const Agents: React.FC = () => {
   const notification = useNotification();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
-
+  const API_URL = import.meta.env.VITE_API_URL;
   // Query Agents list
   const { data: agents = [], isLoading } = useQuery<Agent[]>({
     queryKey: ['agents-list'],
@@ -76,7 +76,7 @@ export const Agents: React.FC = () => {
 
   const handleCopyInstallCmd = () => {
     if (!createdAgent) return;
-    const cmd = `curl -fsSL https://raw.githubusercontent.com/abhishekkkk-15/infra-cd/main/scripts/agent.sh | sh -s -- --token ${createdAgent.token} --server ${window.location.origin}`;
+    const cmd = `curl -fsSL https://raw.githubusercontent.com/abhishekkkk-15/infra-cd/main/scripts/agent.sh | sh -s -- --token ${createdAgent.token} --server ${API_URL}`;
     navigator.clipboard.writeText(cmd);
     setCopiedText(true);
     notification.success('Copied install script', 'Ready to run in terminal.');
@@ -342,7 +342,7 @@ export const Agents: React.FC = () => {
                     </div>
 
                     <div className="p-3 bg-zinc-950 rounded-lg border border-zinc-850/80 text-[11px] text-zinc-300 break-all select-text font-mono leading-relaxed">
-                      <code>{`curl -fsSL https://raw.githubusercontent.com/abhishekkkk-15/infra-cd/main/scripts/agent.sh | sh -s -- --token ${createdAgent.token} --server ${window.location.origin}`}</code>
+                      <code>{`curl -fsSL https://raw.githubusercontent.com/abhishekkkk-15/infra-cd/main/scripts/agent.sh | sh -s -- --token ${createdAgent.token} --server ${API_URL}`}</code>
                     </div>
                   </div>
 
