@@ -3,9 +3,9 @@ jobs:
   - name: "Build API Backend"
     script: |
       echo "Building Go API server..."
-      go build -o api.exe ./cmd/infra-cd/main.go
+      go build -o api ./cmd/infra-cd/main.go
       
   - name: "Run API Tests"
     script: |
       echo "Running Go tests..."
-      ./api
+      go test -v ./...
