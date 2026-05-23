@@ -8,4 +8,4 @@ jobs:
   - name: "Run API Tests"
     script: |
       echo "Running Go tests..."
-      echo "done"
+      ./api
