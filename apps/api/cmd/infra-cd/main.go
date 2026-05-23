@@ -158,6 +158,7 @@ func main() {
 		deployments.POST("/:id/steps", handlers.CreateDeploymentStep)
 		deployments.PATCH("/:id/steps/:stepId", handlers.UpdateDeploymentStep)
 		deployments.POST("/:id/logs", handlers.AppendDeploymentLog)
+		deployments.POST("/:id/pipeline-config", handlers.ReportPipelineConfig)
 	}
 
 	// Agents UI endpoints

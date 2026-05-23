@@ -159,6 +159,13 @@ func RunDeployment(c *client.Client, d client.Deployment) error {
 			if err != nil {
 				return fmt.Errorf("invalid pipeline config: %v", err)
 			}
+
+			// Read raw YAML file and report it to the central server so it is populated in the database.
+			if yamlBytes, readErr := os.ReadFile(configPath); readErr == nil && ctx.Client != nil {
+				if reportErr := ctx.Client.ReportPipelineConfig(ctx.DeployID, string(yamlBytes)); reportErr != nil {
+					ctx.logInfo(fmt.Sprintf("Warning: failed to report pipeline configuration: %v", reportErr))
+				}
+			}
 		}
 	}
 

@@ -181,3 +181,16 @@ func (c *Client) GetProjectEnvVars(projectID string) (map[string]string, error) 
 	}
 	return envMap, nil
 }
+
+func (c *Client) ReportPipelineConfig(deployID, config string) error {
+	resp, err := c.resty.R().
+		SetBody(map[string]string{"pipeline_config": config}).
+		Post(fmt.Sprintf("/deployments/%s/pipeline-config", deployID))
+	if err != nil {
+		return err
+	}
+	if resp.IsError() {
+		return fmt.Errorf("reporting pipeline config failed: %s", resp.String())
+	}
+	return nil
+}

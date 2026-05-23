@@ -221,3 +221,12 @@ func StreamLogs(c *gin.Context, deploymentID uuid.UUID) {
 		}
 	})
 }
+
+// ReportPipelineConfig updates the associated project's pipeline_config in the database.
+func ReportPipelineConfig(deploymentID uuid.UUID, config string) error {
+	var deployment models.Deployment
+	if err := db.DB.Preload("Project").First(&deployment, "id = ?", deploymentID).Error; err != nil {
+		return err
+	}
+	return db.DB.Model(&deployment.Project).Update("pipeline_config", config).Error
+}

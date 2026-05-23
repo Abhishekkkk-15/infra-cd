@@ -199,3 +199,24 @@ func TriggerDeploymentWebhook(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, deployment)
 }
+
+// ReportPipelineConfig handles POST /deployments/:id/pipeline-config (called by agent)
+func ReportPipelineConfig(c *gin.Context) {
+	deploymentID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid deployment id"})
+		return
+	}
+	var body struct {
+		PipelineConfig string `json:"pipeline_config" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := services.ReportPipelineConfig(deploymentID, body.PipelineConfig); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "saved"})
+}
