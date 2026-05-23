@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -43,6 +44,9 @@ func main() {
 	}
 	fmt.Printf("✓ Agent verified: %s (ID: %s)\n", agent.Name, agent.ID)
 
+	// shutdown is closed when the agent detects it has been deregistered.
+	shutdown := make(chan struct{})
+
 	// 2. Start heartbeat goroutine
 	go func() {
 		for {
@@ -57,6 +61,11 @@ func main() {
 
 			err := apiClient.SendHeartbeat(agent.ID, cpuUsage, ramUsage)
 			if err != nil {
+				if errors.Is(err, client.ErrAgentDeregistered) {
+					log.Println("Agent has been removed from the server. Shutting down.")
+					close(shutdown)
+					return
+				}
 				log.Printf("Heartbeat failed: %v", err)
 			}
 			time.Sleep(15 * time.Second)
@@ -66,8 +75,20 @@ func main() {
 	// 3. Main Poll Loop
 	fmt.Println("Listening for pending deployments...")
 	for {
+		// Check if shutdown was signalled by heartbeat goroutine
+		select {
+		case <-shutdown:
+			log.Println("Shutdown signal received. Exiting.")
+			os.Exit(0)
+		default:
+		}
+
 		deployments, err := apiClient.GetPendingDeployments(agent.ID)
 		if err != nil {
+			if errors.Is(err, client.ErrAgentDeregistered) {
+				log.Println("Agent has been removed from the server. Shutting down.")
+				os.Exit(0)
+			}
 			log.Printf("Failed to poll deployments: %v", err)
 			time.Sleep(5 * time.Second)
 			continue

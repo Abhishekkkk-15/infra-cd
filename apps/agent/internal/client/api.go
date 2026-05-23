@@ -1,11 +1,16 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/go-resty/resty/v2"
 )
+
+// ErrAgentDeregistered is returned when the server responds with 401 indicating
+// this agent token is no longer valid (agent was deleted from the dashboard).
+var ErrAgentDeregistered = errors.New("agent has been deregistered from the server")
 
 type Client struct {
 	BaseURL string
@@ -72,6 +77,9 @@ func (c *Client) SendHeartbeat(agentID string, cpuUsage, ramUsage float64) error
 	if err != nil {
 		return err
 	}
+	if resp.StatusCode() == 401 {
+		return ErrAgentDeregistered
+	}
 	if resp.IsError() {
 		return fmt.Errorf("heartbeat failed: %s", resp.String())
 	}
@@ -83,6 +91,9 @@ func (c *Client) GetPendingDeployments(agentID string) ([]Deployment, error) {
 	resp, err := c.resty.R().SetResult(&result).Get(fmt.Sprintf("/agents/%s/pending-deployments", agentID))
 	if err != nil {
 		return nil, err
+	}
+	if resp.StatusCode() == 401 {
+		return nil, ErrAgentDeregistered
 	}
 	if resp.IsError() {
 		return nil, fmt.Errorf("get pending failed: %s", resp.String())
