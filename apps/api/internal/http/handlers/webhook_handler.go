@@ -148,7 +148,7 @@ func GithubWebhook(c *gin.Context) {
 		}
 
 		if shouldTrigger {
-			if _, err := services.TriggerDeploymentWithCommit(wh.ProjectID, payload.HeadCommit.ID, payload.HeadCommit.Message); err != nil {
+			if _, err := services.TriggerDeploymentWithCommit(wh.ProjectID, payload.HeadCommit.ID, payload.HeadCommit.Message, "", false); err != nil {
 				lastErr = err
 			} else {
 				triggeredCount++

@@ -228,7 +228,9 @@ func RollbackDeployment(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid deployment id"})
 		return
 	}
-	deployment, err := services.RollbackDeployment(id)
+	// Assuming manual rollback from UI doesn't know the exact failing commit offhand, we pass empty string or let UI pass it.
+	// We'll pass empty for manual rollbacks for now, since AutoRollback passes the correct failing commit.
+	deployment, err := services.RollbackDeployment(id, "", false)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

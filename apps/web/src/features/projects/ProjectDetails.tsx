@@ -19,7 +19,8 @@ import {
   Server,
   Terminal,
   FileCode,
-  Folder
+  Folder,
+  RotateCcw
 } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import { apiClient } from '../../api';
@@ -159,6 +160,19 @@ export const ProjectDetails: React.FC = () => {
     },
     onError: (err: any) => {
       notification.error('Error saving build path', err.message || 'Update failed');
+    }
+  });
+
+  const updateAutoRollbackMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      return apiClient.put(`/projects/${id}`, { auto_rollback: enabled });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      notification.success('Auto-Rollback Saved', 'Project auto-rollback configuration updated.');
+    },
+    onError: (err: any) => {
+      notification.error('Error saving auto-rollback', err.message || 'Update failed');
     }
   });
 
@@ -785,6 +799,28 @@ export const ProjectDetails: React.FC = () => {
               {updateBuildPathMutation.isPending ? 'Saving...' : 'SAVE PATH'}
             </button>
           </div>
+        </div>
+
+        {/* Auto-Rollback Section */}
+        <div className="p-4 bg-zinc-950 border border-zinc-850 rounded-xl space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-bold text-zinc-300 flex items-center gap-1.5 font-sans">
+              <RotateCcw className="w-4 h-4 text-emerald-400" /> Auto-Rollback on Failure
+            </h4>
+            <label className="flex items-center cursor-pointer relative">
+              <input 
+                type="checkbox" 
+                className="sr-only peer" 
+                checked={project.auto_rollback || false}
+                onChange={(e) => updateAutoRollbackMutation.mutate(e.target.checked)}
+                disabled={updateAutoRollbackMutation.isPending}
+              />
+              <div className="w-9 h-5 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+            </label>
+          </div>
+          <p className="text-zinc-500 leading-relaxed font-sans text-xs">
+            If enabled, the system will automatically rollback to the last successful deployment if a new deployment fails.
+          </p>
         </div>
 
         {/* Project Deploy Token Section */}

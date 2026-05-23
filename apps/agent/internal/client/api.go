@@ -54,10 +54,11 @@ type Project struct {
 }
 
 type Deployment struct {
-	ID        string  `json:"id"`
-	ProjectID string  `json:"project_id"`
-	CommitSHA string  `json:"commit_sha"`
-	Branch    string  `json:"branch"`
+	ID                 string  `json:"id"`
+	ProjectID          string  `json:"project_id"`
+	CommitSHA          string  `json:"commit_sha"`
+	Branch             string  `json:"branch"`
+	RollbackFromCommit string  `json:"rollback_from_commit"`
 	Project   Project `json:"project"` // The API needs to preload Project in PendingDeployments for us to access this!
 }
 

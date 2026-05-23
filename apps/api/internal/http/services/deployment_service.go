@@ -17,11 +17,11 @@ import (
 
 // TriggerDeployment creates a new deployment record and launches the runner asynchronously.
 func TriggerDeployment(projectID uuid.UUID) (models.Deployment, error) {
-	return TriggerDeploymentWithCommit(projectID, "", "")
+	return TriggerDeploymentWithCommit(projectID, "", "", "", false)
 }
 
 // TriggerDeploymentWithCommit creates a new deployment record with commit info and launches the runner.
-func TriggerDeploymentWithCommit(projectID uuid.UUID, commitSHA, commitMsg string) (models.Deployment, error) {
+func TriggerDeploymentWithCommit(projectID uuid.UUID, commitSHA, commitMsg, rollbackFromCommit string, isAutoRollback bool) (models.Deployment, error) {
 	// Verify project exists
 	var project models.Project
 	if err := db.DB.First(&project, "id = ?", projectID).Error; err != nil {
@@ -29,11 +29,13 @@ func TriggerDeploymentWithCommit(projectID uuid.UUID, commitSHA, commitMsg strin
 	}
 
 	d := models.Deployment{
-		ProjectID:     projectID,
-		Status:        models.DeploymentPending,
-		Branch:        project.Branch,
-		CommitSHA:     commitSHA,
-		CommitMessage: commitMsg,
+		ProjectID:          projectID,
+		Status:             models.DeploymentPending,
+		Branch:             project.Branch,
+		CommitSHA:          commitSHA,
+		CommitMessage:      commitMsg,
+		RollbackFromCommit: rollbackFromCommit,
+		IsAutoRollback:     isAutoRollback,
 	}
 
 	if project.AgentID != nil {
@@ -138,7 +140,35 @@ func UpdateDeploymentStatus(id uuid.UUID, status string) error {
 		now := time.Now()
 		updates["finished_at"] = now
 	}
-	return db.DB.Model(&models.Deployment{}).Where("id = ?", id).Updates(updates).Error
+	err := db.DB.Model(&models.Deployment{}).Where("id = ?", id).Updates(updates).Error
+	if err != nil {
+		return err
+	}
+
+	// Auto-Rollback logic
+	if s == models.DeploymentFailed {
+		go func() {
+			var d models.Deployment
+			if err := db.DB.Preload("Project").First(&d, "id = ?", id).Error; err != nil {
+				return
+			}
+			if !d.Project.AutoRollback || d.IsAutoRollback {
+				return // Disabled or we just failed an auto-rollback (prevent loop)
+			}
+
+			// Find last successful deployment
+			var lastSuccess models.Deployment
+			err := db.DB.Where("project_id = ? AND status = ? AND id != ?", d.ProjectID, models.DeploymentSuccess, id).
+				Order("created_at desc").
+				First(&lastSuccess).Error
+			
+			if err == nil {
+				_, _ = RollbackDeployment(lastSuccess.ID, d.CommitSHA, true)
+			}
+		}()
+	}
+
+	return nil
 }
 
 func CreateDeploymentStep(deploymentID uuid.UUID, name, command, status string, order int) (models.DeploymentStep, error) {
@@ -259,16 +289,21 @@ func ReportPipelineConfig(deploymentID uuid.UUID, config string) error {
 }
 
 // RollbackDeployment triggers a new deployment matching the commit and branch of a past deployment.
-func RollbackDeployment(id uuid.UUID) (models.Deployment, error) {
+func RollbackDeployment(id uuid.UUID, rollbackFromCommit string, isAuto bool) (models.Deployment, error) {
 	var oldDeployment models.Deployment
 	if err := db.DB.Preload("Project").First(&oldDeployment, "id = ?", id).Error; err != nil {
 		return models.Deployment{}, fmt.Errorf("deployment not found: %w", err)
 	}
 
-	msg := fmt.Sprintf("Rollback to commit %.8s: %s", oldDeployment.CommitSHA, oldDeployment.CommitMessage)
-	if oldDeployment.CommitSHA == "" || oldDeployment.CommitSHA == "HEAD" {
-		msg = fmt.Sprintf("Rollback to manual trigger: %s", oldDeployment.CommitMessage)
+	prefix := "Rollback"
+	if isAuto {
+		prefix = "Auto-Rollback"
 	}
 
-	return TriggerDeploymentWithCommit(oldDeployment.ProjectID, oldDeployment.CommitSHA, msg)
+	msg := fmt.Sprintf("%s to commit %.8s: %s", prefix, oldDeployment.CommitSHA, oldDeployment.CommitMessage)
+	if oldDeployment.CommitSHA == "" || oldDeployment.CommitSHA == "HEAD" {
+		msg = fmt.Sprintf("%s to manual trigger: %s", prefix, oldDeployment.CommitMessage)
+	}
+
+	return TriggerDeploymentWithCommit(oldDeployment.ProjectID, oldDeployment.CommitSHA, msg, rollbackFromCommit, isAuto)
 }

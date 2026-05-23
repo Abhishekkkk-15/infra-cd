@@ -22,6 +22,7 @@ type Project struct {
 	UserID               uuid.UUID              `json:"user_id"`
 	AgentID              *uuid.UUID             `json:"agent_id"`
 	DeployToken          string                 `gorm:"unique" json:"deploy_token"`
+	AutoRollback         bool                   `json:"auto_rollback"`
 	BaseModel
 	Deployment           []Deployment           `gorm:"constraint:OnDelete:CASCADE;" json:"-"`
 	EnvironmentVariables []EnvironmentVariable  `gorm:"constraint:OnDelete:CASCADE;" json:"-"`

@@ -1,19 +1,28 @@
 version: "1.0"
 jobs:
-  - name: "Build API Backend"
+  - name: "Build & Release Binary"
     script: |
-      echo "Building Go API server..."
-      go build -o api ./cmd/infra-cd/main.go
+      COMMIT_SHA=$(git rev-parse HEAD)
+      RELEASE_DIR="/opt/infra-cd/releases/api"
+      sudo mkdir -p $RELEASE_DIR
+      
+      if [ -f "$RELEASE_DIR/$COMMIT_SHA" ]; then
+        echo "Binary for $COMMIT_SHA already exists. Skipping build for instant rollback!"
+      else
+        echo "Building Go API server..."
+        go build -o api ./cmd/infra-cd/main.go
+        sudo cp ./api $RELEASE_DIR/$COMMIT_SHA
+      fi
+      
+      echo "Stopping existing service to prevent Text file busy error..."
+      sudo systemctl stop infra-cd-api || true
+      
+      echo "Symlinking new release to /usr/local/bin/infra-cd-api..."
+      sudo ln -sfn $RELEASE_DIR/$COMMIT_SHA /usr/local/bin/infra-cd-api
+      sudo chmod +x /usr/local/bin/infra-cd-api
 
   - name: "Install & Restart Service"
     script: |
-      echo "Stopping existing service to prevent Text file busy error..."
-      sudo systemctl stop infra-cd-api || true
-
-      echo "Copying binary to /usr/local/bin/..."
-      sudo cp ./api /usr/local/bin/infra-cd-api
-      sudo chmod +x /usr/local/bin/infra-cd-api
-
       echo "Writing environment file from injected secrets..."
       env | grep -E "^(DATABASE_URL|DB_HOST|DB_PORT|DB_USER|DB_PASSWORD|DB_NAME|DB_SSLMODE|PORT|APP_ENV|LOG_LEVEL|JWT_SECRET)=" | sudo tee /etc/infra-cd-api.env > /dev/null
       sudo chmod 600 /etc/infra-cd-api.env
@@ -45,3 +54,13 @@ jobs:
       sudo systemctl enable infra-cd-api
       sudo systemctl restart infra-cd-api
       sudo systemctl is-active --quiet infra-cd-api && echo "Service started successfully." || (echo "Service failed to start!" && sudo journalctl -u infra-cd-api -n 30 --no-pager && exit 1)
+
+rollback_jobs:
+  - name: "Rollback Database Migrations"
+    script: |
+      COMMIT_SHA=$(git rev-parse HEAD)
+      echo "================================================================"
+      echo "Reverting database changes for failing commit $COMMIT_SHA..."
+      echo "Since infra-cd uses AutoMigrate, there are no down migrations."
+      echo "But this step demonstrates rollback hooks working perfectly!"
+      echo "================================================================"

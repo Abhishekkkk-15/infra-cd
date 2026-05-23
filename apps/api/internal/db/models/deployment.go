@@ -24,9 +24,11 @@ type Deployment struct {
 	Status        DeploymentStatus `json:"status"`
 	CommitSHA     string           `json:"commit_sha"`
 	CommitMessage string           `json:"commit_message"`
-	Branch        string           `json:"branch"`
-	StartedAt     *time.Time       `json:"started_at"`
-	FinishedAt    *time.Time       `json:"finished_at"`
+	Branch             string           `json:"branch"`
+	IsAutoRollback     bool             `json:"is_auto_rollback"`
+	RollbackFromCommit string           `json:"rollback_from_commit"`
+	StartedAt          *time.Time       `json:"started_at"`
+	FinishedAt         *time.Time       `json:"finished_at"`
 	BaseModel
 	Project Project
 	Agent   Agent

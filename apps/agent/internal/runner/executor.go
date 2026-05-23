@@ -96,11 +96,37 @@ func RunDeployment(c *client.Client, d client.Deployment) error {
 		return err
 	}
 
-	// 3. Checkout specific commit if provided
+	// 3. Checkout RollbackFromCommit and run rollback_jobs if applicable
+	if d.RollbackFromCommit != "" && d.RollbackFromCommit != "HEAD" {
+		ctx.logInfo(fmt.Sprintf("Rollback detected: checking out failing commit %s to run rollback hooks", d.RollbackFromCommit))
+		checkoutCmdStr := fmt.Sprintf("git checkout %s", d.RollbackFromCommit)
+		err = executeStep(ctx, "Git Checkout (Failing Commit)", checkoutCmdStr, 2, func() error {
+			checkoutCmd := exec.Command("git", "checkout", d.RollbackFromCommit)
+			checkoutCmd.Dir = workDir
+			return ctx.streamCommand(checkoutCmd, envList)
+		})
+		if err == nil {
+			rollbackConfig, _ := loadPipelineConfig(d, workDir, ctx)
+			if rollbackConfig != nil && len(rollbackConfig.RollbackJobs) > 0 {
+				ctx.logInfo("Executing rollback jobs from failing commit...")
+				for i, job := range rollbackConfig.RollbackJobs {
+					stepName := fmt.Sprintf("Rollback Hook: %s", job.Name)
+					hookErr := executeStep(ctx, stepName, job.Script, 3+i, func() error {
+						return ctx.runScript(workDir, job, envList)
+					})
+					if hookErr != nil {
+						ctx.logInfo(fmt.Sprintf("Rollback hook %s failed, continuing anyway: %v", job.Name, hookErr))
+					}
+				}
+			}
+		}
+	}
+
+	// 4. Checkout specific commit if provided
 	if d.CommitSHA != "" && d.CommitSHA != "HEAD" {
 		ctx.logInfo(fmt.Sprintf("Checking out commit %s", d.CommitSHA))
 		checkoutCmdStr := fmt.Sprintf("git checkout %s", d.CommitSHA)
-		err = executeStep(ctx, "Git Checkout", checkoutCmdStr, 2, func() error {
+		err = executeStep(ctx, "Git Checkout", checkoutCmdStr, 10, func() error {
 			checkoutCmd := exec.Command("git", "checkout", d.CommitSHA)
 			checkoutCmd.Dir = workDir
 			return ctx.streamCommand(checkoutCmd, envList)
@@ -110,66 +136,19 @@ func RunDeployment(c *client.Client, d client.Deployment) error {
 		}
 	}
 
-	// 4. Restore Cache
+	// 5. Restore Cache
 	ctx.logInfo("Restoring cached dependencies (if any)...")
-	_ = executeStep(ctx, "Restore Cache", "Extracting cached folders", 3, func() error {
+	_ = executeStep(ctx, "Restore Cache", "Extracting cached folders", 11, func() error {
 		if err := extractCache(d.ProjectID, workDir); err != nil {
 			return err
 		}
 		return nil
 	})
 
-	// 5. Execute pipeline or fallback deploy script
-	var config *PipelineConfig
-
-	if d.Project.PipelineConfig != "" {
-		ctx.logInfo("Using database-stored pipeline configuration...")
-		config, err = ParsePipelineConfigString(d.Project.PipelineConfig)
-		if err != nil {
-			return fmt.Errorf("invalid database pipeline config: %v", err)
-		}
-	} else {
-		// Look inside the project's build path first if specified
-		var configPath string
-		if d.Project.BuildPath != "" {
-			p := filepath.Join(workDir, d.Project.BuildPath, ".infra-cd.yaml")
-			if _, err := os.Stat(p); err == nil {
-				configPath = p
-			} else {
-				p = filepath.Join(workDir, d.Project.BuildPath, ".infra-cd.yml")
-				if _, err := os.Stat(p); err == nil {
-					configPath = p
-				}
-			}
-		}
-
-		// Fallback to repository root
-		if configPath == "" {
-			p := filepath.Join(workDir, ".infra-cd.yaml")
-			if _, err := os.Stat(p); err == nil {
-				configPath = p
-			} else {
-				p = filepath.Join(workDir, ".infra-cd.yml")
-				if _, err := os.Stat(p); err == nil {
-					configPath = p
-				}
-			}
-		}
-
-		if configPath != "" {
-			ctx.logInfo(fmt.Sprintf("Found %s, parsing pipeline configuration...", filepath.Base(configPath)))
-			config, err = ParsePipelineConfig(configPath)
-			if err != nil {
-				return fmt.Errorf("invalid pipeline config: %v", err)
-			}
-
-			// Read raw YAML file and report it to the central server so it is populated in the database.
-			if yamlBytes, readErr := os.ReadFile(configPath); readErr == nil && ctx.Client != nil {
-				if reportErr := ctx.Client.ReportPipelineConfig(ctx.DeployID, string(yamlBytes)); reportErr != nil {
-					ctx.logInfo(fmt.Sprintf("Warning: failed to report pipeline configuration: %v", reportErr))
-				}
-			}
-		}
+	// 6. Execute pipeline or fallback deploy script
+	config, err := loadPipelineConfig(d, workDir, ctx)
+	if err != nil {
+		return err
 	}
 
 	if config != nil {
@@ -558,4 +537,61 @@ func matchPathPattern(pattern, path string) bool {
 	}
 
 	return false
+}
+
+// loadPipelineConfig extracts the loading of the pipeline configuration from database or file.
+func loadPipelineConfig(d client.Deployment, workDir string, ctx *ExecutionContext) (*PipelineConfig, error) {
+	if d.Project.PipelineConfig != "" {
+		ctx.logInfo("Using database-stored pipeline configuration...")
+		config, err := ParsePipelineConfigString(d.Project.PipelineConfig)
+		if err != nil {
+			return nil, fmt.Errorf("invalid database pipeline config: %v", err)
+		}
+		return config, nil
+	}
+
+	// Look inside the project's build path first if specified
+	var configPath string
+	if d.Project.BuildPath != "" {
+		p := filepath.Join(workDir, d.Project.BuildPath, ".infra-cd.yaml")
+		if _, err := os.Stat(p); err == nil {
+			configPath = p
+		} else {
+			p = filepath.Join(workDir, d.Project.BuildPath, ".infra-cd.yml")
+			if _, err := os.Stat(p); err == nil {
+				configPath = p
+			}
+		}
+	}
+
+	// Fallback to repository root
+	if configPath == "" {
+		p := filepath.Join(workDir, ".infra-cd.yaml")
+		if _, err := os.Stat(p); err == nil {
+			configPath = p
+		} else {
+			p = filepath.Join(workDir, ".infra-cd.yml")
+			if _, err := os.Stat(p); err == nil {
+				configPath = p
+			}
+		}
+	}
+
+	if configPath != "" {
+		ctx.logInfo(fmt.Sprintf("Found %s, parsing pipeline configuration...", filepath.Base(configPath)))
+		config, err := ParsePipelineConfig(configPath)
+		if err != nil {
+			return nil, fmt.Errorf("invalid pipeline config: %v", err)
+		}
+
+		// Read raw YAML file and report it to the central server so it is populated in the database.
+		if yamlBytes, readErr := os.ReadFile(configPath); readErr == nil && ctx.Client != nil {
+			if reportErr := ctx.Client.ReportPipelineConfig(ctx.DeployID, string(yamlBytes)); reportErr != nil {
+				ctx.logInfo(fmt.Sprintf("Warning: failed to report pipeline configuration: %v", reportErr))
+			}
+		}
+		return config, nil
+	}
+
+	return nil, nil
 }
