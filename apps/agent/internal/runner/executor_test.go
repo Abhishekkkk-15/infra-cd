@@ -1,6 +1,8 @@
 package runner
 
 import (
+	"os"
+	"strings"
 	"testing"
 )
 
@@ -103,3 +105,37 @@ func TestShouldRunJob(t *testing.T) {
 		})
 	}
 }
+
+func TestDockerRunScriptGeneration(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "runner-docker-test-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	ctx := &ExecutionContext{
+		Client:   nil, // client is nil, we check that it doesn't panic and uses fallback print
+		DeployID: "test-deploy",
+	}
+
+	job := Job{
+		Name:   "test-docker-job",
+		Script: "echo 'hello world'",
+		Image:  "alpine:latest",
+	}
+
+	// We expect runScript to try executing the "docker" command.
+	// Whether docker is installed or not on the test machine, calling it will produce an error
+	// (either file not found, or docker command failed, or connection refused).
+	// We verify that the execution attempted to use "docker" and did not succeed silently on host.
+	err = ctx.runScript(tempDir, job, []string{"ENV_VAR=test_value"})
+	if err == nil {
+		t.Fatal("expected error calling docker, but got nil")
+	}
+
+	errStr := err.Error()
+	if !strings.Contains(strings.ToLower(errStr), "docker") && !strings.Contains(strings.ToLower(errStr), "exit status") {
+		t.Errorf("expected error to mention 'docker' or 'exit status', but got: %s", errStr)
+	}
+}
+

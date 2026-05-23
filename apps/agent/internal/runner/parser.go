@@ -17,6 +17,7 @@ type Job struct {
 	Name   string   `yaml:"name"`
 	Script string   `yaml:"script"`
 	Paths  []string `yaml:"paths"`
+	Image  string   `yaml:"image"`
 }
 
 // ParsePipelineConfig reads and unmarshals the .infra-cd.yaml file

@@ -20,14 +20,20 @@ type ExecutionContext struct {
 }
 
 func executeStep(ctx *ExecutionContext, name, command string, order int, execFunc func() error) error {
-	step, err := ctx.Client.CreateDeploymentStep(ctx.DeployID, name, command, "running", order)
-	if err != nil {
-		ctx.logError(fmt.Sprintf("Failed to create step '%s': %v", name, err))
+	var step *client.DeploymentStep
+	var err error
+	if ctx.Client != nil {
+		step, err = ctx.Client.CreateDeploymentStep(ctx.DeployID, name, command, "running", order)
+		if err != nil {
+			ctx.logError(fmt.Sprintf("Failed to create step '%s': %v", name, err))
+		}
+	} else {
+		fmt.Printf("[STEP RUNNING] %s: %s\n", name, command)
 	}
 
 	err = execFunc()
 
-	if step != nil {
+	if ctx.Client != nil && step != nil {
 		status := "success"
 		output := "Completed successfully"
 		if err != nil {
@@ -36,6 +42,12 @@ func executeStep(ctx *ExecutionContext, name, command string, order int, execFun
 		}
 		if updateErr := ctx.Client.UpdateDeploymentStep(ctx.DeployID, step.ID, status, output); updateErr != nil {
 			ctx.logError(fmt.Sprintf("Failed to update step '%s': %v", name, updateErr))
+		}
+	} else {
+		if err != nil {
+			fmt.Printf("[STEP FAILED] %s: %v\n", name, err)
+		} else {
+			fmt.Printf("[STEP SUCCESS] %s\n", name)
 		}
 	}
 
@@ -135,7 +147,7 @@ func RunDeployment(c *client.Client, d client.Deployment) error {
 			}
 			ctx.logInfo(fmt.Sprintf("--- Running Job: %s ---", job.Name))
 			err = executeStep(ctx, job.Name, job.Script, stepOrder, func() error {
-				return ctx.runScript(workDir, job.Script, envList)
+				return ctx.runScript(workDir, job, envList)
 			})
 			if err != nil {
 				return fmt.Errorf("job '%s' failed: %v", job.Name, err)
@@ -157,7 +169,7 @@ func RunDeployment(c *client.Client, d client.Deployment) error {
 				script = "docker-compose up -d --build"
 			}
 			err = executeStep(ctx, "Docker Deploy", script, 4, func() error {
-				return ctx.runScript(workDir, script, envList)
+				return ctx.runScript(workDir, Job{Script: script}, envList)
 			})
 			if err != nil {
 				return fmt.Errorf("docker deploy failed: %v", err)
@@ -169,7 +181,7 @@ func RunDeployment(c *client.Client, d client.Deployment) error {
 				script = "./deploy.sh"
 			}
 			err = executeStep(ctx, "Shell Deploy", script, 4, func() error {
-				return ctx.runScript(workDir, script, envList)
+				return ctx.runScript(workDir, Job{Script: script}, envList)
 			})
 			if err != nil {
 				return fmt.Errorf("shell deploy failed: %v", err)
@@ -181,17 +193,56 @@ func RunDeployment(c *client.Client, d client.Deployment) error {
 	return nil
 }
 
-func (ctx *ExecutionContext) runScript(workDir, script string, envList []string) error {
+func (ctx *ExecutionContext) runScript(workDir string, job Job, envList []string) error {
+	if job.Image != "" {
+		ctx.logInfo(fmt.Sprintf("Running job inside sandboxed container: %s", job.Image))
+
+		// 1. Write the script content to .infra_cd_run.sh with Unix line endings
+		scriptPath := filepath.Join(workDir, ".infra_cd_run.sh")
+		scriptContent := strings.ReplaceAll(job.Script, "\r\n", "\n")
+		if !strings.HasPrefix(scriptContent, "#!") {
+			scriptContent = "#!/bin/sh\n" + scriptContent
+		}
+		if err := os.WriteFile(scriptPath, []byte(scriptContent), 0755); err != nil {
+			return fmt.Errorf("failed to write sandbox runner script: %w", err)
+		}
+		defer os.Remove(scriptPath)
+
+		// 2. Write environment variables to .infra_cd_env inside workspace
+		envPath := filepath.Join(workDir, ".infra_cd_env")
+		var envFileContent strings.Builder
+		for _, envVar := range envList {
+			envFileContent.WriteString(envVar)
+			envFileContent.WriteString("\n")
+		}
+		if err := os.WriteFile(envPath, []byte(envFileContent.String()), 0600); err != nil {
+			return fmt.Errorf("failed to write sandbox env file: %w", err)
+		}
+		defer os.Remove(envPath)
+
+		// 3. Construct and run docker command
+		cmd := exec.Command("docker", "run", "--rm",
+			"--env-file", "/workspace/.infra_cd_env",
+			"-v", workDir+":/workspace",
+			"-w", "/workspace",
+			job.Image,
+			"sh", ".infra_cd_run.sh",
+		)
+		cmd.Dir = workDir
+		return ctx.streamCommand(cmd, nil)
+	}
+
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
 		scriptPath := filepath.Join(workDir, fmt.Sprintf("step_%d.ps1", time.Now().UnixNano()))
-		psScript := "$ErrorActionPreference = 'Stop'\n" + script
+		psScript := "$ErrorActionPreference = 'Stop'\n" + job.Script
 		if err := os.WriteFile(scriptPath, []byte(psScript), 0755); err != nil {
 			return err
 		}
+		defer os.Remove(scriptPath)
 		cmd = exec.Command("powershell", "-ExecutionPolicy", "Bypass", "-File", scriptPath)
 	} else {
-		cmd = exec.Command("sh", "-e", "-c", script)
+		cmd = exec.Command("sh", "-e", "-c", job.Script)
 	}
 
 	cmd.Dir = workDir
@@ -224,7 +275,9 @@ func (ctx *ExecutionContext) streamCommand(cmd *exec.Cmd, envList []string) erro
 		for scanner.Scan() {
 			text := scanner.Text()
 			fmt.Println(">", text)
-			ctx.Client.AppendLog(ctx.DeployID, text, "stdout")
+			if ctx.Client != nil {
+				ctx.Client.AppendLog(ctx.DeployID, text, "stdout")
+			}
 		}
 	}()
 
@@ -235,7 +288,9 @@ func (ctx *ExecutionContext) streamCommand(cmd *exec.Cmd, envList []string) erro
 		for scanner.Scan() {
 			text := scanner.Text()
 			fmt.Println("E>", text)
-			ctx.Client.AppendLog(ctx.DeployID, text, "stderr")
+			if ctx.Client != nil {
+				ctx.Client.AppendLog(ctx.DeployID, text, "stderr")
+			}
 		}
 	}()
 
@@ -246,14 +301,18 @@ func (ctx *ExecutionContext) streamCommand(cmd *exec.Cmd, envList []string) erro
 func (ctx *ExecutionContext) logInfo(msg string) {
 	fmt.Println("[INFO]", msg)
 	// We use "stdout" as a generic message type for system events in logs
-	go ctx.Client.AppendLog(ctx.DeployID, msg, "stdout")
-	time.Sleep(100 * time.Millisecond) // buffer ordering
+	if ctx.Client != nil {
+		go ctx.Client.AppendLog(ctx.DeployID, msg, "stdout")
+		time.Sleep(100 * time.Millisecond) // buffer ordering
+	}
 }
 
 func (ctx *ExecutionContext) logError(msg string) {
 	fmt.Println("[ERROR]", msg)
-	go ctx.Client.AppendLog(ctx.DeployID, msg, "stderr")
-	time.Sleep(100 * time.Millisecond) // buffer ordering
+	if ctx.Client != nil {
+		go ctx.Client.AppendLog(ctx.DeployID, msg, "stderr")
+		time.Sleep(100 * time.Millisecond) // buffer ordering
+	}
 }
 
 func getChangedFiles(workDir, commitSHA string) ([]string, error) {
