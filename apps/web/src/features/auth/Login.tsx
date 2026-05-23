@@ -46,8 +46,8 @@ export const Login: React.FC = () => {
     resolver: zodResolver(isSignUp ? signupSchema : loginSchema),
     defaultValues: {
       name: '',
-      email: 'admin@infra-cd.dev',
-      password: 'admin-password',
+      email: '',
+      password: '',
     }
   });
 
@@ -77,7 +77,7 @@ export const Login: React.FC = () => {
 
   return (
     <div className="flex h-screen w-screen bg-zinc-950 text-zinc-100 overflow-hidden font-sans select-none">
-      
+
       {/* LEFT SIDE: Platform Graphics & Status stdout */}
       <div className="hidden lg:flex lg:w-1/2 bg-zinc-950 relative border-r border-zinc-900 flex-col justify-between p-12 overflow-hidden">
         {/* Animated Background Mesh */}
@@ -251,7 +251,7 @@ export const Login: React.FC = () => {
               disabled={isLoading}
               className={`
                 w-full h-10 mt-6 rounded-lg text-xs font-mono font-bold tracking-wide transition shadow-lg cursor-pointer
-                ${isLoading 
+                ${isLoading
                   ? 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 cursor-not-allowed'
                   : 'bg-emerald-500 hover:bg-emerald-400 text-zinc-950 border border-emerald-400 hover:shadow-emerald-500/10'
                 }

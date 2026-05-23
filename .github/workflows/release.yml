@@ -1,0 +1,52 @@
+name: Release Agent Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Build Binaries
+        run: |
+          mkdir -p build
+          
+          # Linux AMD64
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o build/agent-linux-amd64 apps/agent/cmd/agent/main.go
+          
+          # Linux ARM64
+          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o build/agent-linux-arm64 apps/agent/cmd/agent/main.go
+          
+          # Darwin AMD64 (macOS Intel)
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o build/agent-darwin-amd64 apps/agent/cmd/agent/main.go
+          
+          # Darwin ARM64 (macOS Apple Silicon)
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o build/agent-darwin-arm64 apps/agent/cmd/agent/main.go
+          
+          # Windows AMD64
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o build/agent-windows-amd64.exe apps/agent/cmd/agent/main.go
+
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/agent-linux-amd64
+            build/agent-linux-arm64
+            build/agent-darwin-amd64
+            build/agent-darwin-arm64
+            build/agent-windows-amd64.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
