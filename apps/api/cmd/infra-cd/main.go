@@ -171,6 +171,7 @@ func main() {
 	agents := api.Group("/agents")
 	{
 		agents.GET("/verify", handlers.VerifyAgent)
+		agents.GET("/:id/ws", handlers.AgentWSHandler)
 		agents.POST("/:id/heartbeat", handlers.Heartbeat)
 		agents.GET("/:id/pending-deployments", handlers.GetPendingDeployments)
 		agents.GET("/projects/:projectId/env", handlers.ListEnvVarsAgent)

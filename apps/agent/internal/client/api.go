@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/google/uuid"
 )
 
 // ErrAgentDeregistered is returned when the server responds with 401 indicating
@@ -20,6 +21,7 @@ type Client struct {
 	BaseURL string
 	Token   string
 	resty   *resty.Client
+	WS      *WSClient
 }
 
 func NewClient(baseURL, token string) *Client {
@@ -31,6 +33,7 @@ func NewClient(baseURL, token string) *Client {
 		BaseURL: baseURL,
 		Token:   token,
 		resty:   c,
+		// WS will be initialized by main.go and attached here
 	}
 }
 
@@ -74,21 +77,14 @@ func (c *Client) VerifyAgent() (*Agent, error) {
 }
 
 func (c *Client) SendHeartbeat(agentID string, cpuUsage, ramUsage float64) error {
-	resp, err := c.resty.R().
-		SetHeader("Content-Type", "application/json").
-		SetBody(map[string]float64{
-			"cpuUsage": cpuUsage,
-			"ramUsage": ramUsage,
-		}).
-		Post(fmt.Sprintf("/agents/%s/heartbeat", agentID))
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode() == 401 {
-		return ErrAgentDeregistered
-	}
-	if resp.IsError() {
-		return fmt.Errorf("heartbeat failed: %s", resp.String())
+	if c.WS != nil {
+		c.WS.Push(WSMessage{
+			Type: "heartbeat",
+			Payload: map[string]float64{
+				"cpuUsage": cpuUsage,
+				"ramUsage": ramUsage,
+			},
+		})
 	}
 	return nil
 }
@@ -109,14 +105,14 @@ func (c *Client) GetPendingDeployments(agentID string) ([]Deployment, error) {
 }
 
 func (c *Client) UpdateDeploymentStatus(deployID, status string) error {
-	resp, err := c.resty.R().
-		SetBody(map[string]string{"status": status}).
-		Patch(fmt.Sprintf("/deployments/%s/status", deployID))
-	if err != nil {
-		return err
-	}
-	if resp.IsError() {
-		return fmt.Errorf("update status failed: %s", resp.String())
+	if c.WS != nil {
+		c.WS.Push(WSMessage{
+			Type: "status_update",
+			Payload: map[string]string{
+				"deployment_id": deployID,
+				"status":        status,
+			},
+		})
 	}
 	return nil
 }
@@ -132,50 +128,50 @@ type DeploymentStep struct {
 }
 
 func (c *Client) CreateDeploymentStep(deployID, name, command, status string, order int) (*DeploymentStep, error) {
-	var step DeploymentStep
-	resp, err := c.resty.R().
-		SetBody(map[string]interface{}{
-			"name":    name,
-			"command": command,
-			"status":  status,
-			"order":   order,
-		}).
-		SetResult(&step).
-		Post(fmt.Sprintf("/deployments/%s/steps", deployID))
-	if err != nil {
-		return nil, err
+	stepID := uuid.New().String()
+	
+	step := &DeploymentStep{
+		ID:           stepID,
+		DeploymentID: deployID,
+		Name:         name,
+		Command:      command,
+		Status:       status,
+		Order:        order,
 	}
-	if resp.IsError() {
-		return nil, fmt.Errorf("create step failed: %s", resp.String())
+
+	if c.WS != nil {
+		c.WS.Push(WSMessage{
+			Type: "step_create",
+			Payload: step,
+		})
 	}
-	return &step, nil
+	return step, nil
 }
 
 func (c *Client) UpdateDeploymentStep(deployID, stepID, status, output string) error {
-	resp, err := c.resty.R().
-		SetBody(map[string]string{
-			"status": status,
-			"output": output,
-		}).
-		Patch(fmt.Sprintf("/deployments/%s/steps/%s", deployID, stepID))
-	if err != nil {
-		return err
-	}
-	if resp.IsError() {
-		return fmt.Errorf("update step failed: %s", resp.String())
+	if c.WS != nil {
+		c.WS.Push(WSMessage{
+			Type: "step_update",
+			Payload: map[string]string{
+				"step_id": stepID,
+				"status":  status,
+				"output":  output,
+			},
+		})
 	}
 	return nil
 }
 
 func (c *Client) AppendLog(deployID, message, logType string) error {
-	resp, err := c.resty.R().
-		SetBody(map[string]string{"message": message, "type": logType}).
-		Post(fmt.Sprintf("/deployments/%s/logs", deployID))
-	if err != nil {
-		return err
-	}
-	if resp.IsError() {
-		return fmt.Errorf("append log failed: %s", resp.String())
+	if c.WS != nil {
+		c.WS.Push(WSMessage{
+			Type: "log_append",
+			Payload: map[string]string{
+				"deployment_id": deployID,
+				"message":       message,
+				"type":          logType,
+			},
+		})
 	}
 	return nil
 }
@@ -201,14 +197,14 @@ func (c *Client) GetProjectEnvVars(projectID string) (map[string]string, error) 
 }
 
 func (c *Client) ReportPipelineConfig(deployID, config string) error {
-	resp, err := c.resty.R().
-		SetBody(map[string]string{"pipeline_config": config}).
-		Post(fmt.Sprintf("/deployments/%s/pipeline-config", deployID))
-	if err != nil {
-		return err
-	}
-	if resp.IsError() {
-		return fmt.Errorf("reporting pipeline config failed: %s", resp.String())
+	if c.WS != nil {
+		c.WS.Push(WSMessage{
+			Type: "pipeline_config_report",
+			Payload: map[string]string{
+				"deployment_id":   deployID,
+				"pipeline_config": config,
+			},
+		})
 	}
 	return nil
 }

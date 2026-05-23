@@ -37,7 +37,7 @@ func main() {
 
 	apiClient := client.NewClient(*serverURL, *token)
 
-	// 1. Verify Agent Token
+	// 1. Verify Agent Token (HTTP)
 	agent, err := apiClient.VerifyAgent()
 	if err != nil {
 		if errors.Is(err, client.ErrInvalidToken) {
@@ -49,10 +49,48 @@ func main() {
 	}
 	fmt.Printf("✓ Agent verified: %s (ID: %s)\n", agent.Name, agent.ID)
 
-	// shutdown is closed when the agent detects it has been deregistered.
-	shutdown := make(chan struct{})
+	// 2. Connect WebSocket
+	wsClient := client.NewWSClient(*serverURL, agent.ID, *token)
+	apiClient.WS = wsClient // Attach WS client to API client
+	wsClient.ConnectWithRetry()
 
-	// 2. Start heartbeat goroutine
+	// Callback when WebSocket pushes a "new_deployment" message
+	wsClient.OnDeploymentTriggered = func(deploymentID string) {
+		log.Printf("Received instant deployment notification via WS: %s", deploymentID)
+		
+		// Wait a small bit in case the DB transaction on the server hasn't committed yet
+		time.Sleep(200 * time.Millisecond)
+
+		deployments, err := apiClient.GetPendingDeployments(agent.ID)
+		if err != nil {
+			log.Printf("Failed to fetch pending deployments after WS trigger: %v", err)
+			return
+		}
+
+		for _, d := range deployments {
+			if d.ID != deploymentID {
+				continue
+			}
+
+			fmt.Printf("\n[Job Picked] Deployment %s for Project %s\n", d.ID, d.ProjectID)
+			
+			// Update status to running (this now streams over WS)
+			_ = apiClient.UpdateDeploymentStatus(d.ID, "running")
+
+			// Execute the deployment!
+			err := runner.RunDeployment(apiClient, d)
+			
+			if err != nil {
+				log.Printf("Deployment %s failed: %v", d.ID, err)
+				_ = apiClient.UpdateDeploymentStatus(d.ID, "failed")
+			} else {
+				log.Printf("Deployment %s completed successfully", d.ID)
+				_ = apiClient.UpdateDeploymentStatus(d.ID, "success")
+			}
+		}
+	}
+
+	// 3. Start heartbeat goroutine (Streams over WS)
 	go func() {
 		for {
 			var cpuUsage float64
@@ -64,59 +102,24 @@ func main() {
 				ramUsage = v.UsedPercent
 			}
 
-			err := apiClient.SendHeartbeat(agent.ID, cpuUsage, ramUsage)
-			if err != nil {
-				if errors.Is(err, client.ErrAgentDeregistered) {
-					log.Println("Agent has been removed from the server. Shutting down.")
-					close(shutdown)
-					return
-				}
-				log.Printf("Heartbeat failed: %v", err)
-			}
+			// Pushes heartbeat async via WS client
+			_ = apiClient.SendHeartbeat(agent.ID, cpuUsage, ramUsage)
+
 			time.Sleep(15 * time.Second)
 		}
 	}()
 
-	// 3. Main Poll Loop
-	fmt.Println("Listening for pending deployments...")
-	for {
-		// Check if shutdown was signalled by heartbeat goroutine
-		select {
-		case <-shutdown:
-			log.Println("Shutdown signal received. Exiting.")
-			os.Exit(0)
-		default:
-		}
-
+	// 4. Initial Fetch (just in case there are pending jobs on boot)
+	go func() {
 		deployments, err := apiClient.GetPendingDeployments(agent.ID)
-		if err != nil {
-			if errors.Is(err, client.ErrAgentDeregistered) {
-				log.Println("Agent has been removed from the server. Shutting down.")
-				os.Exit(0)
-			}
-			log.Printf("Failed to poll deployments: %v", err)
-			time.Sleep(5 * time.Second)
-			continue
-		}
-
-		for _, d := range deployments {
-			fmt.Printf("\n[Job Picked] Deployment %s for Project %s\n", d.ID, d.ProjectID)
-			
-			// Update status to running
-			apiClient.UpdateDeploymentStatus(d.ID, "running")
-
-			// Execute the deployment!
-			err := runner.RunDeployment(apiClient, d)
-			
-			if err != nil {
-				log.Printf("Deployment %s failed: %v", d.ID, err)
-				apiClient.UpdateDeploymentStatus(d.ID, "failed")
-			} else {
-				log.Printf("Deployment %s completed successfully", d.ID)
-				apiClient.UpdateDeploymentStatus(d.ID, "success")
+		if err == nil {
+			for _, d := range deployments {
+				wsClient.OnDeploymentTriggered(d.ID)
 			}
 		}
+	}()
 
-		time.Sleep(5 * time.Second)
-	}
+	// Block forever (WS ReadPump keeps alive)
+	fmt.Println("Listening for deployments via WebSocket...")
+	select {}
 }

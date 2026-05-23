@@ -10,6 +10,7 @@ import (
 	"github.com/abhishekkkk-15/infra-cd/api/internal/db"
 	"github.com/abhishekkkk-15/infra-cd/api/internal/db/models"
 	"github.com/abhishekkkk-15/infra-cd/api/internal/deployment"
+	"github.com/abhishekkkk-15/infra-cd/api/internal/ws"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -54,6 +55,12 @@ func TriggerDeploymentWithCommit(projectID uuid.UUID, commitSHA, commitMsg strin
 	// Otherwise, let the assigned external agent pull it from the queue.
 	if d.AgentID == nil {
 		go deployment.Run(d.ID)
+	} else {
+		// Notify the agent instantly via WebSocket
+		_ = ws.DefaultManager.PushToAgent(*d.AgentID, ws.Message{
+			Type:    "new_deployment",
+			Payload: map[string]string{"deployment_id": d.ID.String()},
+		})
 	}
 
 	return d, nil
@@ -93,6 +100,11 @@ func TriggerDeploymentWithToken(projectID uuid.UUID, token string, branch string
 
 	if d.AgentID == nil {
 		go deployment.Run(d.ID)
+	} else {
+		_ = ws.DefaultManager.PushToAgent(*d.AgentID, ws.Message{
+			Type:    "new_deployment",
+			Payload: map[string]string{"deployment_id": d.ID.String()},
+		})
 	}
 
 	return d, nil
@@ -136,6 +148,21 @@ func CreateDeploymentStep(deploymentID uuid.UUID, name, command, status string, 
 		Command:      command,
 		Status:       models.StepStatus(status),
 		Order:        order,
+	}
+	err := db.DB.Create(&step).Error
+	return step, err
+}
+
+func CreateDeploymentStepWithID(id string, deploymentID uuid.UUID, name, command, status string, order int) (models.DeploymentStep, error) {
+	step := models.DeploymentStep{
+		DeploymentID: deploymentID,
+		Name:         name,
+		Command:      command,
+		Status:       models.StepStatus(status),
+		Order:        order,
+	}
+	if parsedID, err := uuid.Parse(id); err == nil {
+		step.ID = parsedID
 	}
 	err := db.DB.Create(&step).Error
 	return step, err
