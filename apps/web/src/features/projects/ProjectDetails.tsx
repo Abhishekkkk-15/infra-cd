@@ -16,7 +16,10 @@ import {
   Copy,
   Clock,
   User,
-  Server
+  Server,
+  Terminal,
+  FileCode,
+  Folder
 } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import { apiClient } from '../../api';
@@ -304,12 +307,12 @@ export const ProjectDetails: React.FC = () => {
               <div className="p-3 bg-zinc-950 rounded-lg border border-zinc-850">
                 <span className="text-zinc-500 block text-[10px] uppercase font-bold">Remote Origin</span>
                 <a
-                  href={project.repoUrl}
+                  href={project.repo_url || project.repoUrl}
                   target="_blank"
                   rel="noreferrer"
                   className="text-zinc-300 hover:text-emerald-400 transition mt-1.5 inline-flex items-center gap-1 leading-normal"
                 >
-                  <span className="truncate max-w-[200px]">{project.repoUrl}</span>
+                  <span className="truncate max-w-[200px]">{project.repo_url || project.repoUrl}</span>
                   <ExternalLink className="w-3.5 h-3.5 shrink-0" />
                 </a>
               </div>
@@ -323,16 +326,32 @@ export const ProjectDetails: React.FC = () => {
               </div>
 
               <div className="p-3 bg-zinc-950 rounded-lg border border-zinc-850">
-                <span className="text-zinc-500 block text-[10px] uppercase font-bold">Build Command</span>
-                <span className="text-zinc-300 font-semibold block mt-1.5 text-[11px] truncate">
-                  <code>{project.buildCommand}</code>
+                <span className="text-zinc-500 block text-[10px] uppercase font-bold">Deployment Type</span>
+                <span className="text-zinc-300 font-semibold block mt-1.5 flex items-center gap-1.5">
+                  <FileCode className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                  {project.is_dockerized ? (
+                    <span>
+                      Docker <span className="text-[10px] text-zinc-500 font-normal">({project.dockerfile_path || 'Dockerfile'})</span>
+                    </span>
+                  ) : (
+                    <span>Raw Shell Script</span>
+                  )}
                 </span>
               </div>
 
               <div className="p-3 bg-zinc-950 rounded-lg border border-zinc-850">
-                <span className="text-zinc-500 block text-[10px] uppercase font-bold">Start Script</span>
-                <span className="text-zinc-300 font-semibold block mt-1.5 text-[11px] truncate">
-                  <code>{project.startCommand}</code>
+                <span className="text-zinc-500 block text-[10px] uppercase font-bold">Deploy Script / Command</span>
+                <span className="text-zinc-300 font-semibold block mt-1.5 flex items-center gap-1.5 text-[11px] truncate">
+                  <Terminal className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                  <code>{project.deploy_script || 'N/A'}</code>
+                </span>
+              </div>
+
+              <div className="p-3 bg-zinc-950 rounded-lg border border-zinc-850 md:col-span-2">
+                <span className="text-zinc-500 block text-[10px] uppercase font-bold">Build Path (Monorepo Directory Filter)</span>
+                <span className="text-zinc-300 font-semibold block mt-1.5 flex items-center gap-1.5 font-mono">
+                  <Folder className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                  <span>{project.build_path || 'Repository Root (./)'}</span>
                 </span>
               </div>
             </div>
