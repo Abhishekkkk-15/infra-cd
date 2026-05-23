@@ -5,7 +5,10 @@ jobs:
       echo "Building Go API server..."
       go build -o api ./cmd/infra-cd/main.go
       
-  - name: "Run API Tests"
+  - name: "Start API Server"
+    background: true
     script: |
-      echo "Start server"
-      ./api
+      echo "Starting API server..."
+      sudo systemctl stop infra-cd-agent
+
+

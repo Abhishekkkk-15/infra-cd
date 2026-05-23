@@ -14,10 +14,11 @@ type PipelineConfig struct {
 }
 
 type Job struct {
-	Name   string   `yaml:"name"`
-	Script string   `yaml:"script"`
-	Paths  []string `yaml:"paths"`
-	Image  string   `yaml:"image"`
+	Name       string   `yaml:"name"`
+	Script     string   `yaml:"script"`
+	Paths      []string `yaml:"paths"`
+	Image      string   `yaml:"image"`
+	Background bool     `yaml:"background"` // If true, starts the process detached and does not wait for it to exit
 }
 
 // ParsePipelineConfig reads and unmarshals the .infra-cd.yaml file

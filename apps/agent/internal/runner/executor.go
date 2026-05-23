@@ -3,6 +3,7 @@ package runner
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -293,6 +294,10 @@ func (ctx *ExecutionContext) runScript(workDir string, job Job, envList []string
 	}
 
 	cmd.Dir = filepath.Join(workDir, ctx.BuildPath)
+
+	if job.Background {
+		return ctx.startBackgroundProcess(cmd, envList)
+	}
 	return ctx.streamCommand(cmd, envList)
 }
 
@@ -343,6 +348,61 @@ func (ctx *ExecutionContext) streamCommand(cmd *exec.Cmd, envList []string) erro
 
 	wg.Wait()
 	return cmd.Wait()
+}
+
+// startBackgroundProcess launches a process in the background without waiting for it to exit.
+// It waits up to 2 seconds to confirm it didn't immediately crash, then detaches.
+func (ctx *ExecutionContext) startBackgroundProcess(cmd *exec.Cmd, envList []string) error {
+	cmd.Env = append(os.Environ(), envList...)
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("failed to create stdout pipe: %w", err)
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("failed to create stderr pipe: %w", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start background process: %w", err)
+	}
+
+	pid := cmd.Process.Pid
+	ctx.logInfo(fmt.Sprintf("Background process started with PID %d — detaching.", pid))
+
+	// Stream output in background goroutines — these will run until the process dies
+	go func() {
+		scanner := bufio.NewScanner(io.MultiReader(stdout, stderr))
+		for scanner.Scan() {
+			text := scanner.Text()
+			fmt.Println(">", text)
+			if ctx.Client != nil {
+				ctx.Client.AppendLog(ctx.DeployID, text, "stdout")
+			}
+		}
+	}()
+
+	// Wait up to 2 seconds to detect an immediate crash
+	doneCh := make(chan error, 1)
+	go func() {
+		doneCh <- cmd.Wait()
+	}()
+
+	select {
+	case exitErr := <-doneCh:
+		// Process exited within 2 seconds — it crashed on startup
+		if exitErr != nil {
+			return fmt.Errorf("background process exited immediately with error: %w", exitErr)
+		}
+		// Exited with code 0 within 2s (unusual but ok)
+		ctx.logInfo(fmt.Sprintf("Background process (PID %d) exited cleanly.", pid))
+		return nil
+	case <-time.After(2 * time.Second):
+		// Still running after 2s — successfully daemonized
+		ctx.logInfo(fmt.Sprintf("Background process (PID %d) is running. Continuing pipeline.", pid))
+		return nil
+	}
 }
 
 func (ctx *ExecutionContext) logInfo(msg string) {
