@@ -4,11 +4,35 @@ jobs:
     script: |
       echo "Building Go API server..."
       go build -o api ./cmd/infra-cd/main.go
-      
-  - name: "Start API Server"
-    background: true
+
+  - name: "Install & Restart Service"
     script: |
-      echo "Starting API server..."
-      sudo systemctl stop infra-cd-agent
+      echo "Copying binary to /usr/local/bin/..."
+      cp ./api /usr/local/bin/infra-cd-api
+      chmod +x /usr/local/bin/infra-cd-api
 
+      echo "Writing systemd unit file..."
+      cat > /etc/systemd/system/infra-cd-api.service << 'EOF'
+      [Unit]
+      Description=infra-cd API Server
+      After=network.target
+      Wants=network-online.target
 
+      [Service]
+      ExecStart=/usr/local/bin/infra-cd-api
+      Restart=always
+      RestartSec=5
+      StandardOutput=journal
+      StandardError=journal
+      SyslogIdentifier=infra-cd-api
+      WorkingDirectory=/usr/local/bin
+
+      [Install]
+      WantedBy=multi-user.target
+      EOF
+
+      echo "Reloading systemd and restarting service..."
+      systemctl daemon-reload
+      systemctl enable infra-cd-api
+      systemctl restart infra-cd-api
+      systemctl is-active --quiet infra-cd-api && echo "Service started successfully." || (echo "Service failed to start!" && exit 1)
