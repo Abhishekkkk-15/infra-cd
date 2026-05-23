@@ -10,7 +10,7 @@ jobs:
       - name: Trigger Deploy
         run: |
           curl -X POST \
-            ${window.location.origin}/api/v1/deployments/webhook/trigger \
+            https://api-infra-cd.onrender.com/api/v1/deployments/webhook/trigger \
             -H "Content-Type: application/json" \
             -d '{
               "project_id": "8cb1b78d-b773-4b86-aecd-4f3c12fa069a",
