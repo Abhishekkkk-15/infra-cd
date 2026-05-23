@@ -12,6 +12,10 @@ import (
 // this agent token is no longer valid (agent was deleted from the dashboard).
 var ErrAgentDeregistered = errors.New("agent has been deregistered from the server")
 
+// ErrInvalidToken is returned during startup verification when the token is
+// rejected by the server (401/403). The agent should stop, not restart.
+var ErrInvalidToken = errors.New("agent token is invalid or revoked")
+
 type Client struct {
 	BaseURL string
 	Token   string
@@ -59,6 +63,9 @@ func (c *Client) VerifyAgent() (*Agent, error) {
 	resp, err := c.resty.R().SetResult(&result).Get("/agents/verify")
 	if err != nil {
 		return nil, err
+	}
+	if resp.StatusCode() == 401 || resp.StatusCode() == 403 {
+		return nil, ErrInvalidToken
 	}
 	if resp.IsError() {
 		return nil, fmt.Errorf("verify failed: %s", resp.String())

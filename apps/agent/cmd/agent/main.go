@@ -40,6 +40,11 @@ func main() {
 	// 1. Verify Agent Token
 	agent, err := apiClient.VerifyAgent()
 	if err != nil {
+		if errors.Is(err, client.ErrInvalidToken) {
+			log.Println("Agent token is invalid or revoked. Please re-register this agent from the dashboard.")
+			log.Println("Stopping agent to prevent restart loop.")
+			os.Exit(0)
+		}
 		log.Fatalf("Failed to verify agent: %v", err)
 	}
 	fmt.Printf("✓ Agent verified: %s (ID: %s)\n", agent.Name, agent.ID)
