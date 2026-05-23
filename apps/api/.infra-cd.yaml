@@ -8,8 +8,8 @@ jobs:
   - name: "Install & Restart Service"
     script: |
       echo "Copying binary to /usr/local/bin/..."
-      cp ./api /usr/local/bin/infra-cd-api
-      chmod +x /usr/local/bin/infra-cd-api
+      sudo cp ./api /usr/local/bin/infra-cd-api
+      sudo chmod +x /usr/local/bin/infra-cd-api
 
       echo "Writing systemd unit file..."
       sudo tee /etc/systemd/system/infra-cd-api.service > /dev/null << 'EOF'
