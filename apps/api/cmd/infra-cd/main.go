@@ -142,10 +142,10 @@ func main() {
 		projects.POST("/:id/deployments", handlers.TriggerDeployment)
 	}
 
-	// Deployments (top-level for detail + agent callbacks)
 	deployments := api.Group("/deployments")
 	{
 		ui.GET("/deployments/:id", handlers.GetDeployment)
+		ui.POST("/deployments/:id/rollback", handlers.RollbackDeployment)
 		// UI stream logs uses EventSource which doesn't easily send auth headers natively unless modified,
 		// but since we want to protect it, we should map it onto `ui` and the frontend needs to handle it or we can leave it public.
 		// For simplicity, we'll map stream to `ui` and see if EventSource works with cookies/tokens in URL,

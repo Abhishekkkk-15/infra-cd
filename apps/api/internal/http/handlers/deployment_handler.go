@@ -220,3 +220,18 @@ func ReportPipelineConfig(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "saved"})
 }
+
+// RollbackDeployment handles POST /deployments/:id/rollback (called by UI)
+func RollbackDeployment(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid deployment id"})
+		return
+	}
+	deployment, err := services.RollbackDeployment(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, deployment)
+}
