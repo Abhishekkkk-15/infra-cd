@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "wait-on ../../packages/openapi/dist/index.js && vite",
+    "dev": "vite",
     "build": "tsc && vite build",
     "test": "vite test",
     "preview": "vite preview",
@@ -16,8 +16,6 @@
     "typecheck": "tsc"
   },
   "dependencies": {
-    "@boilerplate/openapi": "workspace:*",
-    "@boilerplate/zod": "workspace:*",
     "@clerk/clerk-react": "^5.38.1",
     "@hookform/resolvers": "^5.2.1",
     "@monaco-editor/react": "^4.7.0",
@@ -59,7 +57,6 @@
     "tw-animate-css": "^1.3.6",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.35.1",
-    "vite": "^7.0.4",
-    "wait-on": "^8.0.4"
+    "vite": "^7.0.4"
   }
 }
