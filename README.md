@@ -146,13 +146,3 @@ You can configure pipelines in two ways:
 2. **Web UI Editor**: Open the project details, click on the **Build Config** tab, write your YAML config in the Monaco editor, and click **SAVE FILE**. The agent will prioritize this database-stored configuration on subsequent deployment runs.
 
 *To revert to using Git-based configuration files, clear all text in the Web UI editor and click **SAVE FILE**.*
-
----
-
-## Roadmap
-
-- [ ] **Role-Based Access Control (RBAC)**: Teams, Admin, and Viewer roles.
-- [ ] **Visual Pipeline Builder**: A drag-and-drop React Flow interface for building pipelines without writing YAML.
-- [ ] **Notification Integrations**: Slack, Discord, and Email alerts for deployment statuses.
-- [ ] **Matrix Builds**: Fan-out deployment jobs to multiple agents for parallel testing (e.g. testing against Node 18, 20, 22 simultaneously).
-- [ ] **Manual Approval Gates**: Pause a pipeline before production deployment and wait for a manual click in the UI.
