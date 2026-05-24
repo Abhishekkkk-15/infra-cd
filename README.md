@@ -4,16 +4,27 @@
 
 ---
 
+## How It Works (The Lifecycle)
+
+1. **Trigger**: A developer pushes code to GitHub, which sends a webhook to the `api` server, OR a user clicks "Deploy" in the web dashboard.
+2. **Queue**: The `api` server creates a new Deployment record in the PostgreSQL database and sets its status to `pending`.
+3. **Poll / Push**: The lightweight `agent` running on your deployment server maintains a WebSocket connection with the `api`. It receives a notification that a new deployment is ready.
+4. **Execute**: The `agent` clones the repository, reads the `.infra-cd.yaml` (or fetches the overridden config from the DB), and begins executing the defined jobs (e.g., Docker builds, test scripts).
+5. **Stream Logs**: As the agent runs the jobs, it streams standard output and standard error back to the `api` server in real-time.
+6. **Live Dashboard**: The `web` dashboard receives these logs via Server-Sent Events (SSE) and displays them instantly to the user, updating the deployment status upon success or failure.
+
+---
+
 ## Architecture & Monorepo Layout
 
 This repository is organized as a Turborepo-managed monorepo using pnpm workspaces:
 
-```
+```text
 infra-cd/
 ├── apps/
 │   ├── api/        # Central Go REST API (Gin + GORM + PostgreSQL)
 │   ├── web/        # React Web Dashboard (Vite + Monaco Editor + Tailwind)
-│   └── agent/      # Lightweight VM Runner Agent (polls API and runs pipelines)
+│   └── agent/      # Lightweight VM Runner Agent (Go, polls API and runs pipelines)
 ├── packages/
 │   ├── openapi/    # Shared API Contract (ts-rest & OpenAPI 3.0 spec)
 │   └── zod/        # Shared validation schemas (Zod)
@@ -27,7 +38,7 @@ infra-cd/
 
 - **Centralized Dashboard**: A modern, dark-mode dashboard to monitor project status, trigger deployments, rotate tokens, assign agents, and manage environment variables.
 - **Lightweight Runner Agent**: A secure, Go-based agent that runs on your deployment VMs, polls the central server for jobs, clones repos, and executes pipeline commands.
-- **Real-Time Logs**: View execution steps and real-time stderr/stdout logs in the dashboard.
+- **Real-Time Logs**: View execution steps and real-time stderr/stdout logs in the dashboard via SSE.
 - **Git Webhook Triggering**: Automatic pipeline triggers when code is pushed to your Git branches (supports GitHub webhooks).
 - **Flexible Pipeline Config (`.infra-cd.yaml`)**: Define complex stages, sandboxed container runners (Docker), directories to cache, and monorepo directory filters.
 - **Database-first Configuration & Git Synchronization**: Edit pipelines directly in the Web UI editor (stored in DB) OR commit them in your Git repo. When the agent deploys, it automatically synchronizes Git configurations back to the central server database.
@@ -77,6 +88,24 @@ infra-cd/
 
 ---
 
+## Running the Agent Standalone
+
+If you want to run the agent on a remote VM (separate from the web dashboard and API):
+
+1. Compile the agent:
+   ```bash
+   cd apps/agent
+   go build -o infra-agent ./cmd/agent/main.go
+   ```
+2. Run the agent and pass the required environment variables. You will need to generate an Agent Token from the web dashboard first:
+   ```bash
+   INFRA_AGENT_TOKEN="your_generated_token" \
+   INFRA_API_URL="https://your-api-domain.com" \
+   ./infra-agent
+   ```
+
+---
+
 ## Pipeline Configuration (`.infra-cd.yaml`)
 
 Define your build and deployment instructions inside a `.infra-cd.yaml` file in the root of your project or in your project's monorepo subdirectory.
@@ -117,3 +146,13 @@ You can configure pipelines in two ways:
 2. **Web UI Editor**: Open the project details, click on the **Build Config** tab, write your YAML config in the Monaco editor, and click **SAVE FILE**. The agent will prioritize this database-stored configuration on subsequent deployment runs.
 
 *To revert to using Git-based configuration files, clear all text in the Web UI editor and click **SAVE FILE**.*
+
+---
+
+## Roadmap
+
+- [ ] **Role-Based Access Control (RBAC)**: Teams, Admin, and Viewer roles.
+- [ ] **Visual Pipeline Builder**: A drag-and-drop React Flow interface for building pipelines without writing YAML.
+- [ ] **Notification Integrations**: Slack, Discord, and Email alerts for deployment statuses.
+- [ ] **Matrix Builds**: Fan-out deployment jobs to multiple agents for parallel testing (e.g. testing against Node 18, 20, 22 simultaneously).
+- [ ] **Manual Approval Gates**: Pause a pipeline before production deployment and wait for a manual click in the UI.
