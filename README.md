@@ -26,8 +26,7 @@ infra-cd/
 │   ├── web/        # React Web Dashboard (Vite + Monaco Editor + Tailwind)
 │   └── agent/      # Lightweight VM Runner Agent (Go, polls API and runs pipelines)
 ├── packages/
-│   ├── openapi/    # Shared API Contract (ts-rest & OpenAPI 3.0 spec)
-│   └── zod/        # Shared validation schemas (Zod)
+│   └── email/        # Email service
 ├── turbo.json      # Turborepo build configuration
 └── pnpm-workspace.yaml
 ```
