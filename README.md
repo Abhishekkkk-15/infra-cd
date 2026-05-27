@@ -4,7 +4,7 @@
 
 ---
 
-## How It Works (The Lifecycle)
+## How It Works 
 
 1. **Trigger**: A developer pushes code to GitHub, which sends a webhook to the `api` server, OR a user clicks "Deploy" in the web dashboard.
 2. **Queue**: The `api` server creates a new Deployment record in the PostgreSQL database and sets its status to `pending`.
