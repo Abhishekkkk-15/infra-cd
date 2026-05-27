@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { Login } from './features/auth/Login';
+import { CliAuth } from './features/auth/CliAuth';
 import { Dashboard } from './features/dashboard/Dashboard';
 import { Projects } from './features/projects/Projects';
 import { ProjectDetails } from './features/projects/ProjectDetails';
@@ -32,6 +33,7 @@ function App() {
         <Routes>
           {/* Public login route */}
           <Route path="/login" element={<Login />} />
+          <Route path="/cli-auth" element={<CliAuth />} />
 
           {/* Protected routes wrapped in the terminal dashboard layout */}
           <Route path="/" element={<DashboardLayout />}>

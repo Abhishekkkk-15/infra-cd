@@ -11,5 +11,6 @@ type User struct {
 	Email    string    `gorm:"size:255;uniqueIndex;not null" json:"email"`
 	Password string    `json:"-"`
 	BaseModel
-	Projects []Project `json:"-"`
+	Projects       []Project       `json:"-"`
+	PersonalTokens []PersonalToken `json:"-"`
 }

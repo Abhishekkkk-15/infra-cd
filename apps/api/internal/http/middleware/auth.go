@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/abhishekkkk-15/infra-cd/api/internal/http/services"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -34,6 +35,18 @@ func RequireAuth() gin.HandlerFunc {
 		}
 
 		tokenString := parts[1]
+
+		if strings.HasPrefix(tokenString, "icd_pat_") {
+			// Validate PAT
+			user, err := services.ValidatePAT(tokenString)
+			if err != nil || user == nil {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired personal access token"})
+				return
+			}
+			c.Set("userID", user.ID.String())
+			c.Next()
+			return
+		}
 
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {

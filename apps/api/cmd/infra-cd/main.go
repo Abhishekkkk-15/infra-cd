@@ -181,6 +181,11 @@ func main() {
 	ui.GET("/system/metrics", handlers.GetSystemMetrics)
 	ui.GET("/system/logs", handlers.GetSystemLogs)
 
+	// Personal Access Tokens
+	ui.POST("/personal-tokens", handlers.CreatePAT)
+	ui.GET("/personal-tokens", handlers.ListPATs)
+	ui.DELETE("/personal-tokens/:id", handlers.RevokePAT)
+
 	// ── Server ────────────────────────────────────────────────────────────────
 	port := os.Getenv("PORT")
 	if port == "" {

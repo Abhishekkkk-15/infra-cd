@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useNotification } from '../../hooks/useNotification';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '../../api';
 
 interface TokenItem {
   id: string;
@@ -24,10 +26,20 @@ export const Settings: React.FC = () => {
   const notification = useNotification();
   
   // API tokens states
-  const [tokens, setTokens] = useState<TokenItem[]>([
-    { id: 'tok-1', name: 'GitHub Actions Client', token: 'icd_pat_83af102b37c...e01a', createdAt: new Date(Date.now() - 3600000 * 24 * 5).toISOString() },
-    { id: 'tok-2', name: 'CLI local daemon', token: 'icd_pat_29cfb1a0e1c...99ba', createdAt: new Date(Date.now() - 3600000 * 24 * 2).toISOString() },
-  ]);
+  const queryClient = useQueryClient();
+  const { data: tokens = [] } = useQuery<TokenItem[]>({
+    queryKey: ['personal-tokens'],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/personal-tokens');
+      // map backend names if necessary, assuming the backend returns an array of tokens
+      return data.map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        token: 'icd_pat_••••••••••••', // only showing masked string for listing
+        createdAt: t.created_at,
+      }));
+    }
+  });
   const [newTokenName, setNewTokenName] = useState('');
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
 
@@ -37,28 +49,43 @@ export const Settings: React.FC = () => {
   const [prefPrune, setPrefPrune] = useState(true);
   const [prefStrategy, setPrefStrategy] = useState('low-cpu');
 
+  const createTokenMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const { data } = await apiClient.post('/personal-tokens', { name });
+      return data;
+    },
+    onSuccess: (data) => {
+      setGeneratedToken(data.token);
+      setNewTokenName('');
+      queryClient.invalidateQueries({ queryKey: ['personal-tokens'] });
+      notification.success('Token Generated', 'New personal access token created.');
+    },
+    onError: () => {
+      notification.error('Error', 'Failed to generate token');
+    }
+  });
+
+  const deleteTokenMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiClient.delete(`/personal-tokens/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['personal-tokens'] });
+      notification.warning('Token Revoked', 'The token was successfully invalidated.');
+    },
+    onError: () => {
+      notification.error('Error', 'Failed to revoke token');
+    }
+  });
+
   const handleGenerateToken = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTokenName.trim()) return;
-
-    const randToken = `icd_pat_${Math.random().toString(16).substr(2, 8)}${Math.random().toString(16).substr(2, 8)}b0ea12`;
-    const newToken: TokenItem = {
-      id: `tok-${Date.now()}`,
-      name: newTokenName,
-      token: `${randToken.slice(0, 15)}...${randToken.slice(-4)}`,
-      createdAt: new Date().toISOString(),
-    };
-
-    setTokens([newToken, ...tokens]);
-    setGeneratedToken(randToken);
-    setNewTokenName('');
-    notification.success('Token Generated', 'New personal access token created.');
+    createTokenMutation.mutate(newTokenName);
   };
 
   const handleDeleteToken = (id: string) => {
-    const name = tokens.find((t) => t.id === id)?.name;
-    setTokens(tokens.filter((t) => t.id !== id));
-    notification.warning('Token Revoked', `Token "${name}" was invalidated.`);
+    deleteTokenMutation.mutate(id);
   };
 
   const handleCopyToken = () => {

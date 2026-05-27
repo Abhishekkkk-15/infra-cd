@@ -23,7 +23,7 @@ func main() {
 		}
 	}()
 
-	if err := dbpkg.AutoMigrate(&models.User{}, &models.Agent{}, &models.Deployment{}, &models.DeploymentLog{}, &models.DeploymentStep{}, &models.Webhook{}, &models.Project{}, &models.EnvironmentVariable{}); err != nil {
+	if err := dbpkg.AutoMigrate(&models.User{}, &models.PersonalToken{}, &models.Agent{}, &models.Deployment{}, &models.DeploymentLog{}, &models.DeploymentStep{}, &models.Webhook{}, &models.Project{}, &models.EnvironmentVariable{}); err != nil {
 		log.Fatalf("failed to run migrations: %v", err)
 	}
 
